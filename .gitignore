@@ -1,0 +1,21 @@
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.env
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Node
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+
+# AI keys & exports
+*.key
+backend/data/exports/
+
+# OS
+.DS_Store
