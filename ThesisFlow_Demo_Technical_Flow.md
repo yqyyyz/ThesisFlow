@@ -26,7 +26,7 @@
 05:00  阶段三(3min) 沉浸精读      → 阅读器：一页纸预读 / 划线升权 / 伴读问答溯源
 08:00  阶段四(2min) 起草商讨      → 写作台起草模式：对话 / 同步大纲 / 隐式记忆提取
 10:00  阶段五(4min) 提案式写作    → 写作模式：提案卡 / 三色引用校验 / 原子写入
-14:00  阶段六(1min) 一键审查修复  → 审查模式：五维建议卡 / 一键修改双校验 / 置灰闭环
+14:00  阶段六(1min) 一键审查修复  → 审查模式：五维建议卡 / 一键修改 / 置灰闭环
 ```
 
 | 阶段 | 前端入口 | 后端能力 | 依赖模型 | 种子数据依赖 |
@@ -36,7 +36,7 @@
 | 三 | 阅读器 `/documents/{id}` | 一页纸预读、批注升权、文档域 top4 问答 | LIGHT（预读）/ STRONG（问答） | 批注数据（现场产生） |
 | 四 | 写作台起草模式 | 商讨对话持久化、大纲提炼、每 4 轮隐式记忆提取 | STRONG（对话）/ LIGHT（记忆提取） | 项目研究问题、记忆池 |
 | 五 | 写作台写作模式 | 提案卡生成、引用自动校验、统一写入 | STRONG（提案）/ LIGHT（校验） | Top 10 文献 + 精读批注 |
-| 六 | 写作台审查模式 | 五维 17 检查点审查、一键修改双校验 | STRONG（审查）/ LIGHT（语义判定） | 已写正文 + 引用记录 |
+| 六 | 写作台审查模式 | 五维 17 检查点审查、一键修改与逐条 Diff | STRONG（审查）/ LIGHT（语义判定） | 已写正文 + 引用记录 |
 
 ## 2. 环境准备与种子数据
 
@@ -227,7 +227,7 @@ python3 serve.py            # 启动后端；前端: cd ../frontend && npm run d
 
 **技术机制**
 - 审查：STRONG 切 Critical Review 视角，仅评审文本本身、不引入外部文献，输出 `{dimension, anchor_text, issue, suggestion, severity}` 列表；
-- 一键修改双重校验：① 重写强制保留原引用标记（完整性规则）；② LIGHT 语义判定「是否解决问题且未改变原意」→ 逐条 Diff 卡；
+- 一键修改：重写强制保留原引用标记（完整性规则）→ 逐条 Diff 卡审核；
 - 采纳走统一写入工具（与提案同一套解析/定位/校验逻辑，第四轮修复）；
 - `resolvedCards` 状态：采纳后建议卡置灰 + 「✓ 已修复」徽标、全选计数排除；重新审查时重置（第六轮新增）；
 - 每次采纳自动留存快照，可演示版本历史回退。
@@ -282,7 +282,7 @@ python3 serve.py            # 启动后端；前端: cd ../frontend && npm run d
 | 引用自动校验（状态标注） | `backend/app/services/verification.py` |
 | 提案卡契约（append/replace/delete） | `backend/app/services/writing.py` · `backend/app/schemas/writing.py` |
 | 原子写入 applyContentChange | `frontend/src/components/writing/WritingWorkspace.tsx:331` |
-| 审查五维 17 检查点 + 一键修改双校验 | `backend/app/prompts/templates.py:100-119` · `backend/app/api/writing.py` |
+| 审查五维 17 检查点 + 一键修改与逐条 Diff 审核 | `backend/app/prompts/templates.py:100-119` · `backend/app/api/writing.py` |
 | 演示引导面板 / 跨页联动 | `frontend/src/lib/demoScript.ts` · `frontend/src/stores/demo.ts` · `frontend/src/components/demo/DemoGuide.tsx` |
 | 演示重置与快照 | `backend/app/services/demo.py`（`export_fixture` / `restore_demo`） |
 | 种子数据构建 | `backend/scripts/seed_demo.py` · `backend/scripts/download_demo_papers.py` |

@@ -7,7 +7,7 @@ import DemoGuide from "@/components/demo/DemoGuide";
 
 export const metadata: Metadata = {
   title: "ThesisFlow - 一站式科研工作台",
-  description: "科研协作智能体 Demo：文献管理、沉浸式精读、防幻觉写作与长效记忆",
+  description: "科研协作智能体 Demo：文献管理、沉浸式精读、引用溯源写作与长效记忆",
 };
 
 export default function RootLayout(props: LayoutProps<"/">) {

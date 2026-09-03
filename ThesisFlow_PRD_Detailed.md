@@ -407,7 +407,7 @@ RESTful 前缀 `/api/v1`；流式响应使用 `text/event-stream`。鉴权：JWT
 | POST | `/projects/{id}/rag:query` (**SSE**) | 项目内问答（起草模式聊天后端） |
 | POST | `/drafts/{id}/writing-chat` (**SSE**) | 写作助手对话：生成修改提案卡（append/replace/delete/reply） |
 | POST | `/drafts/{id}/review` | 审查模式，生成五维 17 检查点建议卡片列表 |
-| POST | `/drafts/{id}/review-apply` | 一键修改所选问题（双重校验 + 逐条 Diff，支持 current_text 冲突重试） |
+| POST | `/drafts/{id}/review-apply` | 一键修改所选问题（自动校验 + 逐条 Diff，支持 current_text 冲突重试） |
 | GET / POST | `/drafts/{id}/snapshots` · `/snapshots/{sid}:restore` | 版本时间线 / Diff / 一键回退 |
 | POST | `/drafts/{id}/citations/{cid}/feedback` | 引用角标反馈（质量埋点） |
 | POST | `/drafts/{id}/export?format=docx\|tex\|md` | 异步导出，轮询任务后返回下载 URL |
@@ -673,7 +673,7 @@ multi_hop/global 检索失败（聚类缺失）时自动降级 fact 路由。
 | 4 | 标题识别加强 | 字号聚类候选（≥85% 最大字号）+ 横幅黑名单（NBER/arXiv/版权页等 20+ 词条）+ 全大写标题与作者名的大小写边界切分 + 低置信度 LIGHT 模型兜底 + 矩阵页手动纠正入口 + 「标题重识别」批量按钮 |
 | 5 | 脉络图谱缓存策略 | `GET docmap` 只读缓存绝不自动重算；新文献仅提示条（「N 篇新文献未纳入」），用户主动点击才重算；防 token 浪费 |
 | 6 | **写作工作台对话驱动改造** | 移除 AI 续写按钮与划词快捷栏；全部写作操作经右侧写作助手对话完成：AI 生成**修改提案卡**（续写追加/替换原文，含引用角标与校验徽标），用户「采纳」后才写入编辑器，「拒绝」可继续讨论迭代；替换类提案按锚点文本定位；对话持久化（刷新不丢） |
-| 7 | 审查一键修改 | 建议卡勾选 → 「AI 一键修改所选问题」→ 逐条重写（硬规则：原引用标记必须保留）→ 双重校验（① 引用标记完整性 ② LIGHT 语义判定「是否解决问题且未改变原意」）→ 逐条 Diff 卡（✓ 校验通过 / ⚠ 需人工复核）→ 采纳即替换并留快照 |
+| 7 | 审查一键修改 | 建议卡勾选 → 「AI 一键修改所选问题」→ 逐条重写（硬规则：原引用标记必须保留）→ 自动校验 → 逐条 Diff 卡（✓ 校验通过 / ⚠ 需人工复核）→ 采纳即替换并留快照 |
 | 8 | 文档维护机制 | 本章即为执行结果；此后每轮改动必须同步更新 PRD（含第九章实现细节）与 README |
 
 ### 10.4 第四轮：精读重构与写入根治（6 项反馈）
