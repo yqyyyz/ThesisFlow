@@ -13,7 +13,7 @@
 | 总时长 | 15 分钟（2 + 3 + 3 + 2 + 4 + 1） |
 | 核心卖点 1 | 一站式工作台：入库 → 四维打分 → 矩阵 → 精读 → 提案式写作全链路闭环 |
 | 核心卖点 2 | 长期记忆沉淀进化：双层 System Prompt + 隐式/显式记忆，「越用越懂你」 |
-| 核心壁垒 | 防幻觉闭环：内联角标生成约束 + 存在性/余弦/NLI 三重校验 + APA 文内引用呈现与溯源 |
+| 核心壁垒 | 引用溯源：内联角标生成约束 + APA 文内引用呈现 + 点击定位原文 |
 
 > **口径说明**：设计稿中「50+ 篇」按实际种子规模改口为「20+ 篇」（24 篇入库，已确认）。
 > 「Top 10 核心文献」在 24 篇规模下仍然成立（按加权总分排序取前 10）。台词卡已按此口径改写。
@@ -35,7 +35,7 @@
 | 二 | 文献矩阵 `/projects/demo/documents` | 四维打分、加权排序、折叠标记、脉络图谱 | LIGHT（打分）/ STRONG（图谱） | 24 篇文献 + 评分 + 图谱 |
 | 三 | 阅读器 `/documents/{id}` | 一页纸预读、批注升权、文档域 top4 问答 | LIGHT（预读）/ STRONG（问答） | 批注数据（现场产生） |
 | 四 | 写作台起草模式 | 商讨对话持久化、大纲提炼、每 4 轮隐式记忆提取 | STRONG（对话）/ LIGHT（记忆提取） | 项目研究问题、记忆池 |
-| 五 | 写作台写作模式 | 提案卡生成、引用双阶段校验、统一写入 | STRONG（提案）/ LIGHT（NLI 校验） | Top 10 文献 + 精读批注 |
+| 五 | 写作台写作模式 | 提案卡生成、引用自动校验、统一写入 | STRONG（提案）/ LIGHT（校验） | Top 10 文献 + 精读批注 |
 | 六 | 写作台审查模式 | 五维 17 检查点审查、一键修改双校验 | STRONG（审查）/ LIGHT（语义判定） | 已写正文 + 引用记录 |
 
 ## 2. 环境准备与种子数据
@@ -53,7 +53,7 @@ python3 serve.py            # 启动后端；前端: cd ../frontend && npm run d
 种子内容（`backend/scripts/seed_demo.py`）：
 
 - **画像**：小林 / 人工智能博士生 / 上下文工程与长上下文 RAG、Agent 记忆体系 / APA / 中文 → 驱动 `[User_Context]` 层；
-- **记忆池**：10 条高置信记忆（`confidence` 0.82–0.95，`type=explicit`，`status=active`）→ 驱动 `[Domain_Memory]` 层，含「Lost-in-the-Middle 与注意力衰减机制关注」「KV Cache 内存开销视角」「GraphRAG/RRF/NLI 校验」「因果推断与机制分析偏好」等；
+- **记忆池**：10 条高置信记忆（`confidence` 0.82–0.95，`type=explicit`，`status=active`）→ 驱动 `[Domain_Memory]` 层，含「Lost-in-the-Middle 与注意力衰减机制关注」「KV Cache 内存开销视角」「GraphRAG/RRF/引用校验」「因果推断与机制分析偏好」等；
 - **项目**：《AI 长上下文管理的工程化措施综述与展望》，research_question 含四大主线（窗口扩展 / GraphRAG / 混合检索 / 校验）；
 - **文献**：24 篇 = 20 篇主题域真实论文（四大主题域，含《Lost in the Middle》核心文献）+ 4 篇主题外低相关样本（基因组学 / 材料科学 / 流体力学 / 天体物理；其中流体力学为 Markdown、天体物理为 Word，其余 PDF）——低相关样本用于演示「< 2.5 分自动折叠」与多格式入库；
 - **脉络图谱**：`regenerate_doc_map` 预生成（聚类 + 关系边 + 脉络叙述）；
@@ -186,22 +186,18 @@ python3 serve.py            # 启动后端；前端: cd ../frontend && npm run d
 
 ---
 
-### 阶段五 · 提案式写作与双重防幻觉校验（4 分钟）
+### 阶段五 · 提案式写作与引用溯源（4 分钟）
 
 **操作动线**
 1. 引导面板「进入写作模式」+ 复制续写指令 `/续写 结合 Top 10 文献与我的批注，撰写关于注意力机制在超长上下文下的局限性`；
-2. AI 输出**提案卡**（约 10-20 秒，非流式整卡）：展示 APA 文内引用角标（作者年份，如（Liu et al., 2023））+ 引用校验徽标；
-3. 讲解三色徽标：🔵 蓝 = 校验通过（余弦 ≥0.70 或 NLI entail）；🟡 黄 = 弱支持（中间带 NLI neutral）；🔴 红 = 无效引用（<0.50 或 NLI contradict / 标记不在证据列表）；
+2. AI 输出**提案卡**（约 10-20 秒，非流式整卡）：展示 APA 文内引用角标（作者年份，如（Liu et al., 2023））+ 引用状态徽标；
+3. 讲解三色徽标：🔵 蓝 = 引用正常；🟡 黄 = 弱支持；🔴 红 = 无效引用（系统自动校验标注）；
 4. 点「采纳」→ 基于 ProseMirror 的 `applyContentChange` 将段落与引用节点原子化写入编辑器；口播「AI 永不直接改稿，决策权在研究者手中」。
 
 **技术机制**
 - 提案契约三模式：append（追加）/ replace（锚点替换）/ delete（锚点删除）（`backend/app/services/writing.py` 提案 Prompt）；
-- 生成侧强约束：Prompt 强制句末内联角标标记（以具体示例 `[1:3]` 表述），明令禁止输出 `[doc_id:chunk_id]`/`[NO_SUPPORT]` 字面占位符字样，证据不足以中文说明并标注人工补充；前端将角标渲染为 APA 文内格式；
-- **双阶段引用校验**（`backend/app/services/verification.py`）：
-  - 存在性检查：标记必须命中本次送模型的证据 chunk 列表，否则 `invalid`；
-  - 向量快筛：句-Chunk 余弦 `<0.50` invalid、`≥0.70` pass；中间带触发 **LIGHT NLI**（entail→normal / contradict→invalid / neutral→weak）；
-  - 数值/因果类断言（正则识别，如 `p<0.05`、`显著提升`）阈值收紧为 0.60/0.80 且强制 NLI；
-- 校验结果落 `citations` 表（`verify_method: vector|nli`，`nli_verdict`）→ 支撑幻觉率/溯源准确率 KPI 口径；
+- 生成侧约束：Prompt 强制句末内联角标标记（以具体示例 `[1:3]` 表述），明令禁止输出 `[doc_id:chunk_id]`/`[NO_SUPPORT]` 字面占位符字样，证据不足以中文说明并标注人工补充；前端将角标渲染为 APA 文内格式；
+- 引用自动校验：生成后的引用经存在性与语义一致性检查，标注正常/弱/无效三态，结果落 `citations` 表支撑引用溯源准确率 KPI 口径（`backend/app/services/verification.py`）；
 - 原子写入：提案文本解析为完整段落 JSON 节点（文本+引用节点）后插入；锚点按后端计算的 `anchor_occurrence` 序号定位（有划选时优先取选区内出现）；替换前校验当前位置文本与锚点一致（文稿变更即中止）；多处出现且无序号 → 明确报错「锚点存在多处，请人工核对」，不再静默替换（`frontend/src/components/writing/WritingWorkspace.tsx:331` `applyContentChange`）。
 
 **数据依赖**：Top 10 文献 chunks（含阶段三升权的 Top Tier 批注 chunk）；大纲路径；素材区选中笔记。
@@ -212,11 +208,11 @@ python3 serve.py            # 启动后端；前端: cd ../frontend && npm run d
 - ✔ 「采纳」后正文与引用节点一次性写入，光标位置正确；「拒绝」不写入可继续对话。
 
 **台词卡**
-> “看，这是 ThesisFlow 最大的特色——防幻觉闭环。所有的引用都有据可查，通过 NLI 语义校验保证‘所写即所引’。AI 给出修改提案，最终决策权始终在研究者手中。”
+> “看，这是 ThesisFlow 的特色——引用全链路溯源。每一条引用都有据可查，点击即可回到原文位置。AI 给出修改提案，最终决策权始终在研究者手中。”
 
 **应急预案**
 - 提案生成 10-20 秒：提前口播“系统正在检索 Top 10 证据块并做引用校验”填充等待；
-- 若某引用被判黄色/红色：**现场保留为亮点**——讲解“弱支持/无效引用正是校验门的价值”，再输入修正指令二次生成；
+- 若某引用被判黄色/红色：**现场保留为亮点**——讲解“弱支持/无效引用正是自动校验的价值”，再输入修正指令二次生成；
 - 锚点无法唯一定位（多处出现且无序号/前缀不唯一）：系统明确报错并提示人工定位（设计内降级路径）。
 
 ---
@@ -244,7 +240,7 @@ python3 serve.py            # 启动后端；前端: cd ../frontend && npm run d
 - ✔ 采纳后卡片置灰、正文更新、快照 +1。
 
 **台词卡**
-> “最后 1 分钟：五维同行审查 + 一键修复。每条建议都有锚点定位，每次修改都经过引用完整性双校验——从入口到出口，防幻觉贯穿全程。”
+> “最后 1 分钟：五维同行审查 + 一键修复。每条建议都有锚点定位，每次修改都经过引用完整性校验并逐条 Diff 确认——从入口到出口，修改始终可控、可回溯。”
 
 **应急预案**：审查全文耗时长 → 改为「审查选中段落」缩短路径；时间不足时跳过采纳动作，仅展示 Diff 卡。
 
@@ -270,7 +266,7 @@ python3 serve.py            # 启动后端；前端: cd ../frontend && npm run d
 | 四分区卡片（核心问题、方法、结论与局限） | 五分区卡片（核心问题/方法/结论/贡献/局限） | 实现在设计稿基础上多「贡献」一区，现场直接展示 |
 | 模型基于内部 Chunk top4 回答并附带 [c1] 锚点 | 一致 | 实现即 top4（`api/reading.py:229`） |
 | 对话满 4 轮后隐式记忆提取 | 一致 | 实现即 `user_turns % 4 == 0`（`api/writing.py:354`） |
-| 蓝色（相似度≥0.70/NLI entail）黄色（弱支持）红色（无效） | 一致；补充：数值/因果断言阈值收紧为 0.60/0.80 | 实现即双阶段校验（`verification.py`） |
+| 蓝色（引用正常）黄色（弱支持）红色（无效） | 一致 | 实现即引用自动校验（`verification.py`） |
 
 ## 6. 附录：关键代码锚点索引
 
@@ -283,7 +279,7 @@ python3 serve.py            # 启动后端；前端: cd ../frontend && npm run d
 | 批注升权 Top Tier | `backend/app/services/reading.py:17` |
 | 伴读问答 top4 + [cN] 锚点 | `backend/app/api/reading.py:229` |
 | 隐式记忆提取（每 4 轮） | `backend/app/api/writing.py:354` · `backend/app/services/memory.py` |
-| 双阶段引用校验（vector→NLI） | `backend/app/services/verification.py` |
+| 引用自动校验（状态标注） | `backend/app/services/verification.py` |
 | 提案卡契约（append/replace/delete） | `backend/app/services/writing.py` · `backend/app/schemas/writing.py` |
 | 原子写入 applyContentChange | `frontend/src/components/writing/WritingWorkspace.tsx:331` |
 | 审查五维 17 检查点 + 一键修改双校验 | `backend/app/prompts/templates.py:100-119` · `backend/app/api/writing.py` |

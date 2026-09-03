@@ -1,6 +1,6 @@
 # ThesisFlow 科研协作智能体 (Demo) 详细产品方案 (PRD)
 
-> **Demo 范围说明**：本文档描述 ThesisFlow 的完整产品方案，Demo 版本覆盖全部四大核心功能模块（领域知识库、文献筛选矩阵、沉浸式精读、多模式写作工作台），以验证"防幻觉 + 长效记忆"的核心产品假设。后续迭代方向包括多人协作、移动端适配等。
+> **Demo 范围说明**：本文档描述 ThesisFlow 的完整产品方案，Demo 版本覆盖全部四大核心功能模块（领域知识库、文献筛选矩阵、沉浸式精读、多模式写作工作台），以验证"全链路工作台 + 长效记忆"的核心产品假设。后续迭代方向包括多人协作、移动端适配等。
 >
 > **文档结构说明**：本文档已将原独立的《上下文工程全流程》文档整体并入——第七章描述上下文工程的**设计意图**，第九章描述其**工程实现**（含模块级配置参数与代码锚点，9.7 节为增量机制与关键链路），第十章为与实现同步的迭代记录。凡标注「规划版」的内容为完整产品愿景，标注「Demo 实现」的为当前代码实际状态，二者差异见第十章章首口径说明。
 
@@ -31,12 +31,12 @@
 | 竞品 | 核心定位 | ThesisFlow 的差异化优势 |
 |------|---------|----------------------|
 | **Elicit** | 基于 LLM 的文献检索与摘要工具 | Elicit 仅覆盖"文献发现"环节，缺少精读批注、写作工作台和引用溯源闭环；ThesisFlow 提供从选题到成稿的全链路支持 |
-| **Scite** | 以引用上下文分析为核心的文献平台 | Scite 侧重引用计量分析，不具备写作辅助能力；ThesisFlow 的防幻觉溯源机制在写作阶段实现 Chunk 级引用绑定 |
+| **Scite** | 以引用上下文分析为核心的文献平台 | Scite 侧重引用计量分析，不具备写作辅助能力；ThesisFlow 的引用溯源机制在写作阶段实现 Chunk 级引用绑定 |
 | **Notion AI** | 通用 AI 写作助手 | 缺乏学术领域深度优化（四维文献打分、RAG 权重路由、学术格式规范）；无长效知识记忆体系 |
-| **Overleaf + AI 插件** | LaTeX 协作编辑平台 | Overleaf 的 AI 功能为轻量级补全/润色，不具备文献管理、知识沉淀和防幻觉溯源能力 |
+| **Overleaf + AI 插件** | LaTeX 协作编辑平台 | Overleaf 的 AI 功能为轻量级补全/润色，不具备文献管理、知识沉淀和引用溯源能力 |
 | **Consensus / Semantic Scholar** | 学术搜索引擎 | 仅提供检索层能力，不覆盖精读、写作与引用追踪环节 |
 
-**核心差异化总结**：ThesisFlow 是目前唯一将"长效记忆 + 防幻觉溯源 + 全链路写作"三者深度融合的科研工具，形成从"领域认知积累 → 文献结构化 → 精准写作"的完整闭环。
+**核心差异化总结**：ThesisFlow 是目前唯一将"长效记忆 + 引用溯源 + 全链路写作"三者深度融合的科研工具，形成从"领域认知积累 → 文献结构化 → 精准写作"的完整闭环。
 
 ## 四、 全局信息架构与空间划分 (Information Architecture)
 为了保证复杂科研任务的有序性，系统在全局架构上采用“用户身份 -> 知识管理域 -> 独立项目空间”的分层设计。
@@ -87,17 +87,17 @@
     *   **AI 自动划线（规划版）**：AI 提炼核心论点/转折并自动划线。
     *   **PDF 解析策略**：文本型 PDF 采用启发式结构化解析（字号聚类识别标题层级，绑定页码与原文坐标）；扫描版 PDF 的 OCR + 版面分析、公式 LaTeX 还原为规划版（Demo 对无文本层文献提示转 Word/Markdown 精读）。
 
-### 模块四：多模式防幻觉协作工作台 (Multi-Mode AI Workspace)
+### 模块四：多模式协作工作台 (Multi-Mode AI Workspace)
 *   **功能描述**：适配科研长文本写作，提供三种场景化模式，动态调整 AI 介入程度；核心交互为**对话驱动的修改提案卡**——AI 永不直接落笔编辑器，用户采纳才写入。
 *   **交互细节**：
     *   **状态 1：起草模式 (Drafting Mode)**：对话框形态。通过与 AI 商讨（回复经 Markdown 渲染），基于文献库梳理出逻辑大纲并敲定摘要，确认后一键同步至左侧大纲（大纲以 Markdown 为底座，可编辑/预览）；商讨对话持久化，每满 4 轮触发隐式记忆提取。
-    *   **状态 2：写作模式 (Writing Mode)**：富文本编辑器主体。全部写作操作经右侧写作助手对话完成：输入指令（续写/修改/删除，可划选段落注入）→ AI 生成修改提案卡（追加/修改/删除三模式 + 改动说明）→ 引用经校验门标注蓝/黄/红三态徽标 → 用户采纳后经统一写入工具原子落笔（锚点定位 + 写入校验），拒绝则继续对话迭代。引用以 **APA 文内格式**呈现（如（Liu et al., 2023）），点击角标跳转精读页定位原文片段。
-    *   **状态 3：审查模式 (Review Mode)**：AI 切换为同行评审视角。按五维度 17 检查点生成建议卡片（含锚点定位与三级严重度），勾选后「AI 一键修改」：重写 + 引用完整性校验 + LLM 语义双重校验 → 逐条 Diff 卡审核采纳，已修复卡片置灰闭环。
+    *   **状态 2：写作模式 (Writing Mode)**：富文本编辑器主体。全部写作操作经右侧写作助手对话完成：输入指令（续写/修改/删除，可划选段落注入）→ AI 生成修改提案卡（追加/修改/删除三模式 + 改动说明）→ 引用自动校验并标注状态徽标 → 用户采纳后经统一写入工具原子落笔（锚点定位 + 写入校验），拒绝则继续对话迭代。引用以 **APA 文内格式**呈现（如（Liu et al., 2023）），点击角标跳转精读页定位原文片段。
+    *   **状态 3：审查模式 (Review Mode)**：AI 切换为同行评审视角。按五维度 17 检查点生成建议卡片（含锚点定位与三级严重度），勾选后「AI 一键修改」→ 逐条 Diff 卡审核采纳，已修复卡片置灰闭环。
     *   **高优上下文融合 (RAG Weighting)**：在起草和写作中，AI 自动赋予"模块三"中用户的划线、标签和备注更高的检索权重；同时在写作界面侧边栏提供"素材引料区"，支持用户勾选精读笔记注入写作上下文。
     *   **版本历史与回退**：系统自动保存每次编辑快照，支持按时间线浏览历史版本并一键回退至任意历史节点。
     *   **导出与格式兼容**：支持导出为 Word (.docx)、LaTeX (.tex) 与 Markdown，导出时按用户设定的引用规范（APA 等）生成参考文献列表（Demo 为内置格式模板）。
     *   **多语言写作支持（规划版）**：AI 根据目标期刊语言自动切换输出语言，并提供中英对照润色建议。
-    *   **用户反馈闭环**：用户对 AI 内容的采纳/拒绝写入反馈表，聚合数据用于下调高频被拒来源的检索权重、积累重排模型微调样本与幻觉率 KPI 埋点。
+    *   **用户反馈闭环**：用户对 AI 内容的采纳/拒绝写入反馈表，聚合数据用于下调高频被拒来源的检索权重、积累重排模型微调样本与引用质量 KPI 埋点。
 
 ## 六、 核心页面布局描述 (UI Layout & Wireframe Concept)
 
@@ -125,7 +125,7 @@
 
 ## 七、 重点：上下文工程设计 (Context Engineering Design)
 
-ThesisFlow 的核心壁垒在于对科研工作流中海量信息的精准调度与记忆管理，即上下文工程。以下说明系统在不同阶段如何组织传递 Prompt Context，避免 AI 迷失或产生幻觉。
+ThesisFlow 的核心壁垒在于对科研工作流中海量信息的精准调度与记忆管理，即上下文工程。以下说明系统在不同阶段如何组织传递 Prompt Context，避免 AI 迷失在无关信息里。
 
 ### 1. 全局分层系统提示 (Layered System Prompts)
 系统级 Prompt 根据用户的层级信息进行动态拼接：
@@ -141,11 +141,11 @@ ThesisFlow 的核心壁垒在于对科研工作流中海量信息的精准调度
 *   **低权重索引 (Base Tier)**：未深入阅读或评分较低文献的基础元数据（标题、关键词），仅在全局宏观提问时作为补充召回。
 *   *路由机制*：当用户指令明确（如：“请依据文献 A 扩写该段”），执行精准匹配检索（Exact Match，强制 `doc_id` 过滤）；当指令模糊时，结合语义检索（Semantic Search）并依据权重分配 Attention。查询入口先做**意图三分类**——事实问答 / 多跳推理 / 全局概览，分别走“精准检索 / 聚类定点 / 物化摘要”三条装配路线（工程实现见 9.7.7）。
 
-### 3. 严格的防幻觉溯源追踪 (Anti-Hallucination Traceability)
+### 3. 严格的引用溯源追踪 (Citation Traceability)
 解决“所写即所引”的核心在于 Prompt 工程与数据结构的深度结合：
 *   **Chunk 级元数据绑定**：在文献入库时，切片（Chunking）的过程必须绑定原文的具体页码和段落 ID (`doc_id`, `page_no`, `chunk_id`)。
 *   **强约束 Prompt 设计**：在写作模式下，给 AI 的提示词必须强制包含以下要求：“基于提供的上下文进行续写或修改，并在引用事实论据时，严格使用角标内联标记（Prompt 中以具体示例 `[1:3]` 表述）。绝对禁止编造未在上下文中出现的引文和结论；证据不足处显式输出证据缺口标记。”
-*   **生成后校验门**：引用标记须通过存在性检查（必须在本次送入模型的证据列表内）与语义一致性检查（引用句与被引 Chunk 的向量相似度达标），中间地带由轻量模型 NLI 语义判定兜底——形成“生成约束 + 双重校验”闭环（实现见 9.2.4）。
+*   **自动校验与状态标注**：生成后的引用经系统自动校验，在提案卡上标注状态（正常/弱/无效），供用户采纳前快速判断。
 *   **前端逆向映射**：前端解析 AI 返回的角标标记，将其渲染为 **APA 文内引用格式**（如（Liu et al., 2023），三态配色保留校验结果）。当用户点击时，前端通过 `chunk_id` 跳转精读页，定位并高亮原始 PDF 对应位置。
 
 ### 4. 模式感知上下文切换 (Mode-Aware Context Switching)
@@ -167,7 +167,6 @@ ThesisFlow 的核心壁垒在于对科研工作流中海量信息的精准调度
 | **用户粘性** | 7 日留存率 | ≥ 40% |
 | **用户粘性** | 领域知识库活跃用户占比（每月至少使用 1 次知识库的用户比例） | ≥ 60% |
 | **AI 质量** | AI 生成内容的用户采纳率（审查模式建议被采纳的比例） | ≥ 50% |
-| **AI 质量** | 幻觉率（用户标注的"虚构引用"占全部引用的比例） | ≤ 2% |
 | **系统性能** | 单次续写/润色响应时间 (P95) | ≤ 5s |
 | **系统性能** | 文献 PDF 解析成功率 | ≥ 90% |
 
@@ -308,16 +307,13 @@ Celery 异步任务驱动，状态机：`uploaded → dedup_checked → parsing 
 5. **溢出压缩执行顺序**：按第七章第 5 节三级梯度——先砍 Base Tier（降为摘要粒度），再压缩 Mid Tier，最后对话历史滑动窗口化（保留最近 N 轮全文、更早退化为摘要）；每次装配计算总 tokens，发生裁剪时在响应中标记 `context_truncated: true`，前端显示"当前上下文已裁剪"提示入口。
 6. **检索结果缓存**：Result Cache（query 指纹，TTL 12h，含 provenance）与 Context Cache（物化摘要，TTL 3 天）；失效钩子见 9.7.8。代码锚点：`backend/app/services/rag.py`、`core/cache.py`、`core/intent.py`。
 
-#### 9.2.4 防幻觉溯源闭环
+#### 9.2.4 引用溯源闭环
 
-对应第七章第 3 节，工程闭环五层：
+对应第七章第 3 节，工程实现：
 
-1. **生成侧强约束**：写作 Prompt 强制句末内联角标标记（以具体示例 `[1:3]` 表述），明令禁止输出 `[doc_id:chunk_id]`/`[NO_SUPPORT]` 字面占位符字样；上下文不支持的事实处以中文说明证据不足并标注人工补充（模板见 9.5 ③）。
+1. **生成侧约束**：写作 Prompt 强制句末内联角标标记（以具体示例 `[1:3]` 表述），明令禁止输出 `[doc_id:chunk_id]`/`[NO_SUPPORT]` 字面占位符字样；上下文不支持的事实处以中文说明证据不足并标注人工补充（模板见 9.5 ③）。
 2. **流式标记解析**：SSE 流式输出中，后端 `CitationParser` 状态机以 `[` 缓冲增量扫描完整标记（防止 streaming 分片切碎）；完整标记经 `citation` 事件下发角标序号，前端按序重建角标并维护会话级映射表。
-3. **生成后校验门 (Citation Verifier，异步不阻塞用户)**：
-   - **存在性检查**：每个引用标记必须能在本次送入模型的上下文 chunk 列表中找到，未找到判 `invalid`；
-   - **一致性检查（双阶段）**：引用所在句与被引 chunk 计算 embedding 余弦相似度——<0.50 判 `invalid`、≥0.70 判 `pass`、中间带触发 LIGHT 模型 NLI 语义判定（entail→normal，contradict→invalid，neutral→weak）；数值/百分比/p 值/因果类高风险断言经正则识别后阈值收紧 +0.1 且强制 NLI；
-   - 校验结果落 `citations` 表（含 `verify_method` 与 `nli_verdict`），聚合后直接支撑第八章"幻觉率 ≤ 2%"与"溯源准确率 ≥ 95%"两项 KPI 的埋点口径。
+3. **生成后自动校验**：每个引用标记经存在性检查与语义一致性检查，在提案卡上标注状态（正常/弱/无效），校验结果落 `citations` 表，支撑第八章"溯源准确率 ≥ 95%"KPI 的埋点口径。
 4. **清洗层兜底**：生成后对替换/修复文本正则清洗字面占位符与英文检查点代码——Prompt 约束之外的最后防线。
 5. **前端逆向映射（呈现层）**：`CitationMark` 由 NodeView React 组件渲染为 **APA 文内引用格式**（如（Liu et al., 2023），作者年份由 `citationMetaStore` 客户端构造，元数据缺失回退数字格式），三态配色保留校验结果；点击角标 → 以 `chunk_id` 查 `(doc_id, page_no)` → 跳转精读页，PDF 跳页闪烁 / Word·Markdown 滚动到来源块闪烁。
 
@@ -343,12 +339,12 @@ Celery 异步任务驱动，状态机：`uploaded → dedup_checked → parsing 
   - `CitationMark`：不可编辑行内节点，attrs `{doc_id, chunk_id, status: normal|weak|invalid}`，NodeView 渲染为 APA 文内格式角标（作者年份），三态配色；
   - `Highlight`：划词高亮与颜色标注；`Comment`：审查建议卡锚点；
   - 学术扩展：标题/列表/表格/数学公式（KaTeX 渲染）。
-- **对话驱动提案卡（核心交互）**：写作操作全部经右侧写作助手对话完成，AI 永不直接落笔。`writing_chat_prompt`（STRONG，json_mode，temp=0.4）输入 = 用户指令（可划选段落注入）+ 编辑上下文（全文 ≤8000 字或选段）+ 大纲标题链 + 起草商讨摘要 + 素材勾选 + RAG 证据块；输出契约四选一：`reply`（讨论回复）/ `append`（新增正文 + 可选 anchor_text）/ `replace`（锚点 + occurrence + 改后内容）/ `delete`（锚点 + occurrence）；生成后、应用前执行 Citation Verifier（与 9.2.4 同门槛），前端提案卡展示引用校验徽标（蓝/黄/红），用户「采纳」才写入、「拒绝」继续讨论迭代。
+- **对话驱动提案卡（核心交互）**：写作操作全部经右侧写作助手对话完成，AI 永不直接落笔。`writing_chat_prompt`（STRONG，json_mode，temp=0.4）输入 = 用户指令（可划选段落注入）+ 编辑上下文（全文 ≤8000 字或选段）+ 大纲标题链 + 起草商讨摘要 + 素材勾选 + RAG 证据块；输出契约四选一：`reply`（讨论回复）/ `append`（新增正文 + 可选 anchor_text）/ `replace`（锚点 + occurrence + 改后内容）/ `delete`（锚点 + occurrence）；生成后引用自动校验，前端提案卡展示引用状态徽标，用户「采纳」才写入、「拒绝」继续讨论迭代。
 - **统一写入工具（applyContentChange）**：提案文本解析为完整段落 JSON 节点（段内文本与 citation 行内节点交替）后原子写入——追加 = 锚点所在文本块尾插入（无锚点才文末）、替换/删除 = 锚点选区原子替换/删除；锚点定位三级回退（精确 → 空白归一 → 前 20 字前缀），文本构建将 citation 节点按 attrs 还原为 `[docId:chunkSeq]` 字面文字参与匹配，多处出现且无序号时明确报错不静默；应用后读回校验，失败即提示（不再静默失败）。
-- **审查模式与一键修改**：五维度 17 检查点建议卡（锚点 + 三级严重度）；勾选后 `review-apply` 逐条重写（硬规则：原引用角标全部原样保留、禁止新增、纯中文），双重校验 = ① 引用标记完整性（规则判定，零成本）② LIGHT 语义判定（是否解决问题且未改变原意）→ 逐条 Diff 卡（✓ 校验通过 / ⚠ 需人工复核）采纳；采纳成功后卡片置灰「✓ 已修复」闭环；同一段落多卡锚点冲突时提供「基于当前文本重试」（`current_text` 参数以已采纳后的新段落重新生成修复）。
+- **审查模式与一键修改**：五维度 17 检查点建议卡（锚点 + 三级严重度）；勾选后 `review-apply` 逐条重写（硬规则：原引用角标全部原样保留、禁止新增、纯中文），经引用完整性自动校验后逐条 Diff 卡（✓ 校验通过 / ⚠ 需人工复核）采纳；采纳成功后卡片置灰「✓ 已修复」闭环；同一段落多卡锚点冲突时提供「基于当前文本重试」（`current_text` 参数以已采纳后的新段落重新生成修复）。
 - **大纲 Markdown 底座**：大纲以 Markdown 字符串持久化于 `drafts.outline_json.markdown`；「同步到大纲」由 STRONG 直接输出 Markdown 大纲；「同步到编辑器」前端解析 md 为 TipTap 节点；写作提案从大纲抽取前 6 个标题拼为「大纲路径」注入上下文。
 - **版本历史**：快照策略 = 打开文档时 + 30 秒防抖 + 显式保存；存储 TipTap JSON；Diff 用 prosemirror-changes 计算；回退 = 恢复快照内容，历史快照永不删除。
-- **反馈闭环**：用户对 AI 内容的采纳/拒绝/修改写入 `ai_feedback`（含 prompt 哈希、召回 chunk id 列表、动作类型）；每周聚合后用于 ① 下调高频被拒来源 chunk 的 tier 权重；② 积累 reranker 微调样本；③ 汇总幻觉标注进入 KPI 看板。
+- **反馈闭环**：用户对 AI 内容的采纳/拒绝/修改写入 `ai_feedback`（含 prompt 哈希、召回 chunk id 列表、动作类型）；每周聚合后用于 ① 下调高频被拒来源 chunk 的 tier 权重；② 积累 reranker 微调样本；③ 汇总引用问题标注进入 KPI 看板。
 
 代码锚点：`backend/app/services/writing.py`、`api/writing.py`。
 
@@ -357,7 +353,7 @@ Celery 异步任务驱动，状态机：`uploaded → dedup_checked → parsing 
 - **结构化预读卡**：摘要 + 结论 + 前 3 chunk（≤3000 字）→ `pre_read_prompt`（LIGHT，json_mode）输出 `{core_question, methods[], conclusions[], contributions, limitations}`，哨兵缓存于 `summary_cache`（重复打开零 LLM 开销）；前端四分区卡片渲染。
 - **伴读问答**：限定本文档——查询向量化 → 文档内全 chunk 余弦 top4 → 证据块 `[c1]..[c4]`（各 ≤900 字）→ STRONG 生成，回答内 `[cN]` 标记随 refs（chunk_key + page_no）返回；前端整体渲染 Markdown 后按标记转为链接徽标，点击 PDF 跳页闪烁 / 结构化视图滚动定位。
 - **主页动态流**：知识洞察 = 事件触发（知识库文献入库 ready）或手动挖掘，注入文献标题/元数据/预读摘要（≤600 字）→ LIGHT 生成 ≤80 字知识增量提示；项目进展摘要 = 签名缓存（md5(文献数, 批注数, 草稿字数, 引用数, 阶段, updated_at)），签名未变直接读缓存零 LLM 开销，变化才调用 LIGHT。
-- **领域图景（报告 + 思维导图）**：材料装配 = 近 15 篇文献（KB + 项目，各带 ≤150 字摘要）+ 活跃记忆 Top6 + 用户领域；报告 STRONG 三段式（研究边界/热点/前沿），材料不足处强制如实标注（防幻觉同构设计）；思维导图 STRONG json_mode：root → 3-5 主方向 → 每方向 2-4 子节点，每节点 `label + 80-150 字进展解读 + related_doc_ids（只准引用材料内 id）+ is_gap`，强制 ≥2 个研究缺口节点。
+- **领域图景（报告 + 思维导图）**：材料装配 = 近 15 篇文献（KB + 项目，各带 ≤150 字摘要）+ 活跃记忆 Top6 + 用户领域；报告 STRONG 三段式（研究边界/热点/前沿），材料不足处强制如实标注；思维导图 STRONG json_mode：root → 3-5 主方向 → 每方向 2-4 子节点，每节点 `label + 80-150 字进展解读 + related_doc_ids（只准引用材料内 id）+ is_gap`，强制 ≥2 个研究缺口节点。
 
 代码锚点：`backend/app/services/reading.py`、`home.py`、`landscape.py`。
 
@@ -413,7 +409,7 @@ RESTful 前缀 `/api/v1`；流式响应使用 `text/event-stream`。鉴权：JWT
 | POST | `/drafts/{id}/review` | 审查模式，生成五维 17 检查点建议卡片列表 |
 | POST | `/drafts/{id}/review-apply` | 一键修改所选问题（双重校验 + 逐条 Diff，支持 current_text 冲突重试） |
 | GET / POST | `/drafts/{id}/snapshots` · `/snapshots/{sid}:restore` | 版本时间线 / Diff / 一键回退 |
-| POST | `/drafts/{id}/citations/{cid}/feedback` | 角标"虚构引用"反馈（幻觉埋点） |
+| POST | `/drafts/{id}/citations/{cid}/feedback` | 引用角标反馈（质量埋点） |
 | POST | `/drafts/{id}/export?format=docx\|tex\|md` | 异步导出，轮询任务后返回下载 URL |
 | GET / PATCH / DELETE | `/memory` · `/memory/{mid}` | 记忆查看、编辑、删除 |
 | GET | `/memory/health-report` | 月度记忆健康报告 |
@@ -493,14 +489,14 @@ issue, suggestion, severity, fix_effort}。
 不改核心观点，输出纯中文正文（不带章节编号）。
 ```
 
-> 其余模板（记忆提取、预读卡、伴读问答、领域图景、进展摘要、打分、NLI 校验等）全部集中于 `backend/app/prompts/templates.py`，与上述契约同步维护。
+> 其余模板（记忆提取、预读卡、伴读问答、领域图景、进展摘要、打分、引用校验等）全部集中于 `backend/app/prompts/templates.py`，与上述契约同步维护。
 
 ### 9.6 非功能设计
 
 - **性能（续写/润色 P95 ≤ 5s）**：流式输出，首 token 目标 ≤ 1.5s；检索与生成解耦，可在用户输入时预取候选 chunk；embedding 与检索结果 LRU 缓存（TTL 10 分钟）；解析/打分全异步 + SSE 进度推送，前端不阻塞。Demo 已知：写作提案为非流式整卡生成（约 10-20 秒），流式预览为后续优化项。
 - **成本控制**：强弱模型分级（写作/审查走强模型，评分/摘要/记忆提取走轻量模型）；单项目 token 用量看板；批量化 embed 与 rerank；二层缓存（9.7.8）与签名缓存（预读卡/进展摘要/图谱）将重复 LLM 调用降到零；演示全流程成本在个位数元级。
 - **安全与隐私**：所有查询强制 `user_id + project_id` 作用域过滤实现数据隔离；PDF 对象存储开启服务端加密；支持用户数据全量导出与账号删除；LLM 请求不含除研究内容外的个人身份信息。
-- **可观测性**：所有 LLM 调用（槽位/模型/时延/tokens）写入 `user_logs` 表（Langfuse 的本地降级），记录 `prefix_hash` 与 TTFT 支撑前缀复用率统计；`citations` 表聚合溯源校验通过率与幻觉率；`GET /api/observability/summary` 提供 LLM 统计（STRONG 占比/TTFT/前缀复用率）、路由分布、缓存命中、引用校验分布口径，直接支撑第八章 KPI 统计；解析成功率、任务失败率配置告警。
+- **可观测性**：所有 LLM 调用（槽位/模型/时延/tokens）写入 `user_logs` 表（Langfuse 的本地降级），记录 `prefix_hash` 与 TTFT 支撑前缀复用率统计；`citations` 表聚合引用校验通过率；`GET /api/observability/summary` 提供 LLM 统计（STRONG 占比/TTFT/前缀复用率）、路由分布、缓存命中、引用校验分布口径，直接支撑第八章 KPI 统计；解析成功率、任务失败率配置告警。
 - **导出实现**：TipTap JSON → Pandoc AST → `.docx` / `.tex` / `.md`；参考文献由 `documents` 元数据经 citeproc + CSL 样式（APA 7th / MLA / Chicago）生成，正文角标编号与文末列表自动对齐；PDF 走 xelatex 编译（中文支持），失败时降级 headless Chrome 打印（Demo 参考文献为内置格式模板，非完整 CSL）。
 - **Demo 工程简化**：单体 FastAPI + BackgroundTasks，不做微服务拆分；SQLite 单实例；无 Docker 依赖，`python3 serve.py` 守护启动。
 
@@ -520,9 +516,9 @@ Prompt: writing_chat_prompt（意图自判定）→ STRONG（json_mode，temp=0.
    ↓
 后端后处理：占位符字样清洗 + append 首行章节编号剥离
    ↓
-生成后、应用前执行 Citation Verifier（与直写模式同门槛）
+生成后引用自动校验
    ↓
-前端提案卡：内容预览 + 引用校验徽标（蓝/黄/红）
+前端提案卡：内容预览 + 引用状态徽标（蓝/黄/红）
    ↓
 采纳 → 经统一写入工具落笔（append 按锚点插入块尾之后 / replace 锚点选区原子替换 / delete 锚点删除）；
 锚点定位：后端按送模型文本计算 anchor_occurrence（有划选时优先取选区内出现）→ 前端取第 N 处；
@@ -531,11 +527,11 @@ Prompt: writing_chat_prompt（意图自判定）→ STRONG（json_mode，temp=0.
 拒绝 → feedback(reject)，对话继续迭代
 ```
 
-关键设计：**AI 永不直接落笔编辑器**；校验前置到采纳决策之前，用户在提案卡上即可看到弱/无效引用。
+关键设计：**AI 永不直接落笔编辑器**；引用状态在采纳决策之前即可见，用户在提案卡上即可判断引用质量。
 
 **统一写入工具（applyContentChange，根治写入失败）**：早期版本把「裸字符串+引用节点」混合数组插入文档根部，ProseMirror 视为非法插入、命令静默失败。现行工具：① 提案内容按换行切分为完整段落节点（段内 `text` 与 `citation` 行内节点交替）；② 追加 = 锚点所在文本块尾 `insertContentAt`（无锚点才文末）；替换/删除 = `setTextSelection` + 原子替换/删除；③ 文档位置映射为 `pos+i`（曾因 `pos+i+1` off-by-one 导致替换后残留首字）；④ 应用后读回校验是否包含新内容，失败即提示，不再静默。
 
-#### 9.7.2 审查一键修改与双重校验
+#### 9.7.2 审查一键修改与采纳冲突处理
 
 ```
 建议卡勾选 → POST review-apply（≤10 条/次）
@@ -543,8 +539,6 @@ Prompt: writing_chat_prompt（意图自判定）→ STRONG（json_mode，temp=0.
 禁止新增角标、禁止输出占位符字样、不改核心观点、输出纯中文不带章节编号）
    ↓
 后处理：占位符清洗 + 首行编号剥离
-校验①：引用标记完整性（重写后集合 ⊇ 重写前集合）——规则判定，零成本
-校验②：review_check_prompt（LIGHT，temp=0.1）→ {"passed":bool,"reason":"≤20字"}
    ↓
 前端逐条 Diff：✓校验通过 / ⚠需人工复核（含原因）→ 采纳才写入（按 anchor_occurrence 定位）
 ```
@@ -599,19 +593,7 @@ multi_hop/global 检索失败（聚类缺失）时自动降级 fact 路由。
 - 键空间：typed 块 `{doc}:1..k`、子块 `{doc}:101..`、父块 `{doc}:9001..`（全数字，兼容引用解析）；
 - 装配：子块命中 → 取父块全文（≤2400 字）入证据块，同父块去重；引用标记仍指向子块（溯源精度不变，证据上下文扩大，减少断章取义）；`POST /rechunk` 迁移端点。
 
-#### 9.7.10 双阶段引用校验（P1）
-
-```
-引用标记 → 存在性检查（不在证据列表 → invalid）
-        → 句-块余弦：<0.50 invalid ｜ ≥0.70 pass ｜中间带 → LIGHT NLI
-NLI：前提=被引片段 / 假设=引用句 → entail→normal，contradict→invalid，neutral→weak
-高风险断言（数值/百分比/p值/因果词 正则识别）：阈值收紧为 0.60/0.80 且强制 NLI
-citations 记录 verify_method（vector/nli）与 nli_verdict，观测端点聚合
-```
-
-（后续 P2 规划：HITL 抽样标注 + 归因标签回流至评测集。）
-
-#### 9.7.11 评分人工反馈校准
+#### 9.7.10 评分人工反馈校准
 
 ```
 矩阵页分数格 ✎ → PUT /documents/{id}/scores
@@ -625,12 +607,12 @@ citations 记录 verify_method（vector/nli）与 nli_verdict，观测端点聚�
 
 设计要点：校正样例只描述「维度-分值-理由」三元组，不携带具体文献身份，防止模型照抄而失校准意义；校准样例与学科锚点互补（锚点给先验尺度，校正样例给个人尺度）；`score_feedback` 即标注集，规模足够后可转轻量模型微调。
 
-#### 9.7.12 起草回复渲染与演示模式
+#### 9.7.11 起草回复渲染与演示模式
 
 - 起草商讨的助手回复经 `react-markdown + remark-gfm` 渲染（列表/小标题/代码/表格），与伴读问答一致的紧凑排版样式；用户消息保持纯文本；
 - **演示模式**：六阶段演讲剧本（记忆唤醒→筛选矩阵→沉浸精读→起草商讨→提案式写作→一键审查修复）；种子数据 = 小林画像（AI 博士生·上下文工程与长上下文 RAG·APA·中文）+ 10 条高置信记忆 + 演示项目《AI 长上下文管理的工程化措施综述与展望》+ 24 篇真实 arXiv 论文（四大主题域 + 4 篇低相关样本演示自动折叠，PDF/Word/Markdown 三格式）+ 预生成脉络图谱；快照机制 = `data/demo_fixture.json`（含向量）+ uploads 快照，`POST /api/admin/demo-reset` 秒级恢复（纯数据恢复，不重跑 LLM）；跨页联动经 zustand `useDemoStore`（pendingOpenDocTitle / pendingMode）；完整台词卡与技术动线见 `ThesisFlow_Demo_Technical_Flow.md`。
 
-#### 9.7.13 代码锚点索引
+#### 9.7.12 代码锚点索引
 
 | 域 | 文件 | 职责 |
 |----|------|------|
@@ -641,7 +623,7 @@ citations 记录 verify_method（vector/nli）与 nli_verdict，观测端点聚�
 | 检索 | `backend/app/services/rag.py` | RRF 混合检索、tier 权重、精排 |
 | 意图与缓存 | `backend/app/core/intent.py` / `core/cache.py` | 查询三分类 / 二层缓存与失效 |
 | 写作 | `backend/app/services/writing.py` / `api/writing.py` | 提案卡契约、三层 System Prompt、审查、清洗兜底 |
-| 引用校验 | `backend/app/services/verification.py` | 双阶段校验（vector + NLI） |
+| 引用校验 | `backend/app/services/verification.py` | 引用状态自动校验 |
 | 记忆 | `backend/app/services/memory.py` | 隐式提取、合并/冲突裁决、注入排序 |
 | 精读 | `backend/app/services/reading.py` | 预读卡、伴读问答、溯源定位 |
 | 图谱 | `backend/app/services/docmap.py` | 聚类、关系边、脉络叙述、Lazy GraphRAG |
@@ -714,10 +696,10 @@ citations 记录 verify_method（vector/nli）与 nli_verdict，观测端点聚�
 | **前缀工程** | 静态前缀/动态后缀分层 | 三层 System Prompt 确定性排序（置信度+ID 双键、保留 2 位小数）；所有调用记录 `prefix_hash` 与 TTFT，供应商侧 KV cache 命中自动受益 |
 | **Parent-Child Chunking** | 双粒度检索装配 | 父块 600-1500 tokens（装配单元，不向量化）+ 子块 200-400 tokens（检索单元，`parent_key` 关联）；typed 块（摘要/结论/参考文献）单粒度；装配阶段子块命中自动扩展父块上下文并去重；`POST /rechunk` 迁移端点 |
 | **Lazy GraphRAG** | 建图成本控制 | 入库时 jieba textrank 零 LLM 实体索引（`chunk_entities`）；聚类 `summary_l1` 物化（TTL）；新文献 delta 增量合入（就近聚类+LIGHT 合并摘要，不重算全社区）；深抽取按需触发：`docmap:deep-extract`（查询实体重叠选 top6 文献，STRONG 抽边写 `graph_edges` 带 provenance，读时合并） |
-| **双阶段引用校验** | vector→NLI→（人工） | `<0.50` invalid ｜ `≥0.70` pass ｜中间带触发 LIGHT NLI（entail/contradict/neutral→正常/无效/弱）；数值/因果类断言正则识别后阈值收紧 +0.1 且强制 NLI；`citations` 记录 `verify_method` 与 `nli_verdict` |
-| **观测端点** | `/api/observability/summary` | LLM 调用统计（STRONG 占比、TTFT 均值、前缀复用率）、路由分布、缓存命中、引用校验分布与幻觉率口径 |
+| **引用校验升级** | 状态标注 | 引用经自动校验标注正常/弱/无效三态，`citations` 记录校验方式与结论，供观测端点聚合 |
+| **观测端点** | `/api/observability/summary` | LLM 调用统计（STRONG 占比、TTFT 均值、前缀复用率）、路由分布、缓存命中、引用校验分布口径 |
 
-**验收口径**（对应升级提案指标）：前缀复用率（目标 ≥0.4）、缓存命中率、deep-extract 触发率（目标 <5%）、STRONG 占比（`llm_calls.strong_ratio`）、NLI 捕获边缘幻觉数（`by_method.nli`）。
+**验收口径**（对应升级提案指标）：前缀复用率（目标 ≥0.4）、缓存命中率、deep-extract 触发率（目标 <5%）、STRONG 占比（`llm_calls.strong_ratio`）、边缘弱引用捕获数。
 
 ### 10.6 第六轮：精读问答与审查闭环修复（2 项反馈）
 
