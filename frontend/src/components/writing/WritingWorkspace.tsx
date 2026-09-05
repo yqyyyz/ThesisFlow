@@ -6,7 +6,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api } from "@/lib/api";
 import EditorPanel from "./EditorPanel";
-import { useDemoStore } from "@/stores/demo";
 import {
   renderCitationLabels,
   useCitationMetaStore,
@@ -210,11 +209,6 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
       })
       .catch(() => {});
   }, [draft?.id, projectId]);
-
-  useEffect(() => {
-    const pending = useDemoStore.getState().consumeMode();
-    if (pending) setMode(pending);
-  }, [projectId]);
 
   useEffect(() => {
     api<{

@@ -3,11 +3,10 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import SettingsModal from "@/components/SettingsModal";
 import NewProjectModal from "@/components/NewProjectModal";
-import DemoGuide from "@/components/demo/DemoGuide";
 
 export const metadata: Metadata = {
   title: "ThesisFlow - 一站式科研工作台",
-  description: "科研协作智能体 Demo：文献管理、沉浸式精读、引用溯源写作与长效记忆",
+  description: "科研协作智能体：文献管理、沉浸式精读、引用溯源写作与长效记忆",
 };
 
 export default function RootLayout(props: LayoutProps<"/">) {
@@ -20,7 +19,6 @@ export default function RootLayout(props: LayoutProps<"/">) {
         </div>
         <SettingsModal />
         <NewProjectModal />
-        <DemoGuide />
       </body>
     </html>
   );

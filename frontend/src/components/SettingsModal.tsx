@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import { useProfileStore } from "@/stores/profile";
 import { useUIStore } from "@/stores/ui";
 
@@ -19,6 +20,8 @@ export default function SettingsModal() {
   const [form, setForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetToast, setResetToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (settingsOpen && profile) {
@@ -47,6 +50,24 @@ export default function SettingsModal() {
       }, 1200);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const resetDemo = async () => {
+    if (
+      !window.confirm(
+        "重置演示数据？将恢复到种子状态（文献/记忆/图谱保留，清除演示中产生的批注与草稿）"
+      )
+    )
+      return;
+    setResetting(true);
+    try {
+      await api("/api/admin/demo-reset", { method: "POST" });
+      setResetToast("演示数据已重置");
+      window.location.href = "/";
+    } catch (e) {
+      setResetToast(`重置失败：${(e as Error).message}`);
+      setResetting(false);
     }
   };
 
@@ -103,6 +124,28 @@ export default function SettingsModal() {
             {toast}
           </div>
         )}
+        <div className="mt-5 border-t border-neutral-100 pt-4">
+          <div className="text-sm font-bold text-neutral-800">演示数据</div>
+          <p className="mt-1 text-xs text-neutral-500">
+            将数据恢复到种子状态：文献、记忆与图谱保留，清除演示过程中产生的批注与草稿（不重跑 AI 任务，秒级完成）
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={resetDemo}
+              disabled={resetting}
+              className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              {resetting ? "重置中…" : "重置演示数据"}
+            </button>
+            {resetToast && (
+              <span
+                className={`text-xs ${resetToast.includes("失败") ? "text-red-600" : "text-emerald-700"}`}
+              >
+                {resetToast}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
