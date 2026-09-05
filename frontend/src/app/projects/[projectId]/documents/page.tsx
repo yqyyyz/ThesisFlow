@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { api, apiForm } from "@/lib/api";
-import { useDemoStore } from "@/stores/demo";
 import { useCitationMetaStore } from "@/stores/citationMeta";
 import {
   STAGE_LABELS,
@@ -47,6 +46,7 @@ export default function DocumentsPage(props: PageProps<"/projects/[projectId]/do
   const [showDimModal, setShowDimModal] = useState(false);
   const [dimDraft, setDimDraft] = useState<{ name: string; desc: string; weight: number }[]>([]);
   const [showFolded, setShowFolded] = useState(false);
+  const [staleDismissed, setStaleDismissed] = useState(false);
   const [weights, setWeights] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,18 +135,6 @@ export default function DocumentsPage(props: PageProps<"/projects/[projectId]/do
     loadDocs().catch((e) => setError((e as Error).message));
     loadDimensions().catch(() => {});
   }, [projectId, loadDocs, loadDimensions]);
-
-  useEffect(() => {
-    const title = useDemoStore.getState().pendingOpenDocTitle;
-    if (!title || docs.length === 0) return;
-    const match = docs.find(
-      (d) => d.status === "ready" && (d.title || "").toLowerCase().includes(title.toLowerCase())
-    );
-    if (match) {
-      useDemoStore.getState().consumeOpenDoc();
-      setReaderDoc(match);
-    }
-  }, [docs]);
 
   useEffect(() => {
     void (async () => {
@@ -355,29 +343,31 @@ export default function DocumentsPage(props: PageProps<"/projects/[projectId]/do
         <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-5 rounded-xl border border-neutral-200 bg-white px-5 py-3">
-        <span className="text-xs font-medium text-neutral-500">排序权重</span>
-        {dimensions.map((d) => (
-          <label key={d.key} className="flex items-center gap-2 text-xs text-neutral-600" title={d.desc}>
-            {d.name}
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={weights[d.key] ?? 0.25}
-              onChange={(e) => setWeights({ ...weights, [d.key]: Number(e.target.value) })}
-            />
-            <span className="w-8 tabular-nums">{(weights[d.key] ?? 0.25).toFixed(2)}</span>
-          </label>
-        ))}
-        <button
-          onClick={saveWeights}
-          className="ml-auto rounded-lg border border-neutral-300 px-3 py-1 text-xs text-neutral-600 hover:bg-neutral-50"
-        >
-          应用权重
-        </button>
-      </div>
+      {view === "matrix" && (
+        <div className="mt-4 flex flex-wrap items-center gap-5 rounded-xl border border-neutral-200 bg-white px-5 py-3">
+          <span className="text-xs font-medium text-neutral-500">排序权重</span>
+          {dimensions.map((d) => (
+            <label key={d.key} className="flex items-center gap-2 text-xs text-neutral-600" title={d.desc}>
+              {d.name}
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={weights[d.key] ?? 0.25}
+                onChange={(e) => setWeights({ ...weights, [d.key]: Number(e.target.value) })}
+              />
+              <span className="w-8 tabular-nums">{(weights[d.key] ?? 0.25).toFixed(2)}</span>
+            </label>
+          ))}
+          <button
+            onClick={saveWeights}
+            className="ml-auto rounded-lg border border-neutral-300 px-3 py-1 text-xs text-neutral-600 hover:bg-neutral-50"
+          >
+            应用权重
+          </button>
+        </div>
+      )}
 
       {view === "matrix" && (
         <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-200 bg-white">
@@ -544,18 +534,26 @@ export default function DocumentsPage(props: PageProps<"/projects/[projectId]/do
               {mapLoading ? "梳理中…" : "重新梳理脉络"}
             </button>
           </div>
-          {mapStale && docmap && (
+          {mapStale && docmap && !staleDismissed && (
             <div className="mb-3 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5">
               <span className="text-xs text-amber-800">
                 有 {newDocCount} 篇新文献尚未纳入当前脉络图谱（为节省 token 未自动更新）
               </span>
-              <button
-                onClick={regenerateMap}
-                disabled={mapLoading}
-                className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
-              >
-                {mapLoading ? "更新中…" : "更新图谱"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setStaleDismissed(true)}
+                  className="text-xs text-amber-700 hover:underline"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={regenerateMap}
+                  disabled={mapLoading}
+                  className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {mapLoading ? "更新中…" : "更新图谱"}
+                </button>
+              </div>
             </div>
           )}
           {mapLoading && !docmap ? (

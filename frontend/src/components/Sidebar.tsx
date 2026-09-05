@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useProfileStore } from "@/stores/profile";
 import { useUIStore } from "@/stores/ui";
-import { useDemoStore } from "@/stores/demo";
 import type { Project } from "@/lib/types";
 
 const DOMAIN_LINKS = [
@@ -19,7 +18,6 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { profile, fetchProfile } = useProfileStore();
   const { openSettings, openNewProject } = useUIStore();
-  const { demoActive, enterDemo, exitDemo } = useDemoStore();
   const [projects, setProjects] = useState<Project[]>([]);
 
   const loadProjects = useCallback(async () => {
@@ -41,20 +39,12 @@ export default function Sidebar() {
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-neutral-200 bg-white">
       <div className="border-b border-neutral-200 px-5 py-4">
         <div className="flex items-center justify-between">
-          <div className="text-lg font-bold tracking-wide text-neutral-900">
-            ThesisFlow
-          </div>
-          <button
-            onClick={() => (demoActive ? exitDemo() : enterDemo())}
-            title={demoActive ? "退出演示模式" : "进入演示模式"}
-            className={`rounded-lg px-2 py-1 text-xs font-medium transition ${
-              demoActive
-                ? "bg-violet-600 text-white shadow-sm hover:bg-violet-700"
-                : "bg-violet-50 text-violet-700 hover:bg-violet-100"
-            }`}
+          <Link
+            href="/"
+            className="text-lg font-bold tracking-wide text-neutral-900 hover:text-blue-600"
           >
-            🎬 演示
-          </button>
+            ThesisFlow
+          </Link>
         </div>
         <div className="mt-0.5 text-xs text-neutral-500">一站式科研工作台</div>
       </div>
