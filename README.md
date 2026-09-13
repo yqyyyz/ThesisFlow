@@ -10,6 +10,7 @@
 | [ThesisFlow_PRD_Detailed.md](./ThesisFlow_PRD_Detailed.md) | 完整产品方案（PRD）：设计意图 + 工程实现 + 迭代记录 |
 | [ThesisFlow_P1_产品测评方案.md](./ThesisFlow_P1_产品测评方案.md) | P1 测评协议：30 个核心任务、Prompt 追踪、人机分工与调优决策树 |
 | [evaluation/p1/](./evaluation/p1/) | P1 可执行测评包：文献清单、任务卡、试评标准、Prompt registry 与运行模板 |
+| [evaluation-workbench/](./evaluation-workbench/) | 独立的测评优化人工协作工作台：查看现状、人工审核、本地保存反馈 |
 | 本文 README.md | 工程文档：问题背景、功能概览、快速启动与种子数据、项目结构 |
 | [ThesisFlow_Presentation_Guide.md](./ThesisFlow_Presentation_Guide.md) | 产品全流程讲解手册（面试演示用）：按模块一~四编排的操作动线与讲解要点 |
 
@@ -62,6 +63,15 @@ npm run dev                 # http://localhost:3000
 
 ## P1 测评与 Prompt 追踪
 
+人工审核通过独立小产品完成，不进入 ThesisFlow 页面和业务 API：
+
+```bash
+cd evaluation-workbench
+./start.sh                 # http://127.0.0.1:8010
+```
+
+工作台只读取测评资料并把反馈保存到自己的本地目录，不会修改 Prompt 或执行模型迭代。保存后回到 Codex，说明“读取工作台反馈并进行迭代”。
+
 测评请求可通过 `X-Evaluation-Run-Id` 和 `X-Evaluation-Task-Id` 请求头关联到具体运行与任务。每次生成式模型调用记录渲染后的 System Prompt、User Prompt、完整 messages、上下文清单、模型参数、输出、错误与哈希。
 
 ```bash
@@ -94,4 +104,5 @@ frontend/
   src/components/writing/         # TipTap 编辑器 + 引用节点 + 三模式工作台
   public/pdf.worker.min.mjs       # PDF.js worker
 evaluation/p1/                    # P1 文献清单、任务、Prompt registry 与运行模板
+evaluation-workbench/             # 独立人工协作产品（任务现状、人工审核、本地反馈）
 ```

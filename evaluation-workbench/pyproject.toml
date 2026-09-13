@@ -1,0 +1,9 @@
+[project]
+name = "evaluation-workbench"
+version = "0.1.0"
+description = "独立的 ThesisFlow 测评优化人工协作工作台"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.34",
+]

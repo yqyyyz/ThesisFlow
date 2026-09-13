@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>任务现状｜测评优化人工协作工作台</title>
+    <link rel="stylesheet" href="/static/base.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark">评</div>
+        <div><div class="brand-title">测评优化人工协作工作台</div><div class="brand-subtitle">独立于 ThesisFlow 运行 · 只记录审核反馈</div></div>
+      </div>
+      <nav class="top-nav"><a class="active" href="/">任务现状</a><a href="/review">人工审核</a></nav>
+    </header>
+    <main class="page">
+      <div class="eyebrow">EVALUATION OVERVIEW</div>
+      <h1>每项能力现在处于什么状态</h1>
+      <p class="lead">点击左侧任意一项，即可查看它对应的产品模块、当前 Prompt 或检索规则，以及已经获得的测试结果。这里仅用于查看，不会修改模型。</p>
+      <section class="summary-grid" id="summary"><div class="summary-card"><div class="value">—</div><div class="label">正在读取</div></div></section>
+      <section class="workspace">
+        <aside class="task-sidebar">
+          <div class="filters" id="filters"></div>
+          <div class="task-list" id="task-list"><div class="empty">正在加载任务…</div></div>
+        </aside>
+        <article class="detail" id="detail"><div class="empty">请选择一项工作</div></article>
+      </section>
+    </main>
+    <script type="module" src="/static/tasks.js"></script>
+  </body>
+</html>
