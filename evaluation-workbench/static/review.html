@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>人工审核｜测评优化人工协作工作台</title>
-    <link rel="stylesheet" href="/static/base.css" />
+    <link rel="stylesheet" href="/static/base.css?v=2" />
   </head>
   <body>
     <header class="app-header">
@@ -24,15 +24,15 @@
           <select id="task-select"><option>正在加载…</option></select>
           <div id="availability"></div>
           <ol class="step-list">
-            <li><span class="step-dot">1</span><span>直接阅读工作台自动载入的当前模型输出。</span></li>
-            <li><span class="step-dot">2</span><span>对照原文或参考标准，点击每一项判断。</span></li>
-            <li><span class="step-dot">3</span><span>写下必须修改的问题，点击“保存到本地”。</span></li>
+            <li><span class="step-dot">1</span><span>阅读表格内的核对方法，对照论文材料检查模型结果。</span></li>
+            <li><span class="step-dot">2</span><span>结果正确就确认；有问题时直接在表格右侧修改。</span></li>
+            <li><span class="step-dot">3</span><span>完成总体判断后保存，再回到 Codex 进行产品迭代。</span></li>
           </ol>
           <a id="status-link" class="secondary-link" style="width:100%;margin-top:16px" href="/">查看该项完整状态</a>
         </aside>
         <article class="review-main" id="review-main"><div class="empty">正在准备审核页面…</div></article>
       </section>
     </main>
-    <script type="module" src="/static/review.js"></script>
+    <script type="module" src="/static/review.js?v=2"></script>
   </body>
 </html>

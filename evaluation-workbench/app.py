@@ -102,6 +102,13 @@ def read_csv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def document_catalog() -> dict[str, dict[str, str]]:
+    return {
+        row["doc_id"]: row
+        for row in read_csv(EVALUATION_DIR / "document_manifest.csv")
+    }
+
+
 def prompt_registry() -> dict[str, dict[str, str]]:
     return {
         row["prompt_template_id"]: row
@@ -335,10 +342,12 @@ def display_path(path: Path) -> str:
 
 def all_tasks() -> list[dict]:
     tasks = []
+    documents = document_catalog()
     for category in ("screening", "reading", "writing"):
         meta = CATEGORY_META[category]
         for row in read_csv(TASK_DIR / f"{category}.csv"):
             task_id = row["task_id"]
+            document_ids = row["documents"].split("|") if row["documents"] else []
             tasks.append(
                 {
                     "id": task_id,
@@ -346,7 +355,14 @@ def all_tasks() -> list[dict]:
                     "category_label": meta["label"],
                     "title": row["title"],
                     "instruction": row["instruction"],
-                    "documents": row["documents"].split("|") if row["documents"] else [],
+                    "documents": document_ids,
+                    "document_details": [
+                        {
+                            "id": document_id,
+                            "title": documents.get(document_id, {}).get("title", document_id),
+                        }
+                        for document_id in document_ids
+                    ],
                     "metric": row["primary_metric"],
                     "status": friendly_status(row["gold_status"]),
                     "availability": "现在可以审核" if row["split"] == "dev" else "最终检查时开放",
