@@ -4,8 +4,12 @@ import ast
 import csv
 import json
 import os
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import urlopen
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -19,6 +23,7 @@ TASK_DIR = EVALUATION_DIR / "tasks"
 FEEDBACK_DIR = APP_DIR / "data" / "feedback"
 STATIC_DIR = APP_DIR / "static"
 THESISFLOW_URL = os.getenv("THESISFLOW_URL", "http://127.0.0.1:3000")
+THESISFLOW_API_URL = os.getenv("THESISFLOW_API_URL", "http://127.0.0.1:8000")
 
 app = FastAPI(title="测评优化人工协作工作台")
 
@@ -86,6 +91,7 @@ class FeedbackPayload(BaseModel):
     confidence: str = Field(default="一般", max_length=20)
     answers: dict = Field(default_factory=dict)
     observed_output: str = Field(default="", max_length=30000)
+    output_ref: dict = Field(default_factory=dict)
     reviewer_note: str = Field(default="", max_length=12000)
     corrected_answer: str = Field(default="", max_length=20000)
     next_action: str = Field(default="", max_length=2000)
@@ -202,6 +208,116 @@ def feedback_status(task_id: str) -> dict:
         return {"saved": False, "saved_at": None, "decision": None}
 
 
+def reference_standard(task_id: str) -> str:
+    path = EVALUATION_DIR / "gold" / "pilot_gold.md"
+    if not path.exists():
+        return ""
+    source = path.read_text("utf-8")
+    marker = f"## {task_id}："
+    start = source.find(marker)
+    if start < 0:
+        return ""
+    end = source.find("\n## ", start + len(marker))
+    section = source[start : end if end >= 0 else len(source)]
+    return section.strip()
+
+
+def model_outputs(task_id: str) -> dict:
+    query = urlencode({"task_id": task_id, "limit": 500})
+    url = f"{THESISFLOW_API_URL}/api/observability/prompt-calls?{query}"
+    api_error = None
+    database_path = REPO_DIR / "backend" / "data" / "thesisflow.db"
+    try:
+        with urlopen(url, timeout=5) as response:
+            body = response.read().decode("utf-8")
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        api_error = str(exc)
+        body = ""
+
+    rows = []
+    for line in body.splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        output = row.get("raw_output")
+        if output in (None, "") and row.get("error"):
+            output = f"调用失败：{row['error']}"
+        if output in (None, ""):
+            continue
+        rows.append(
+            {
+                "prompt_call_id": row.get("prompt_call_id"),
+                "created_at": row.get("created_at"),
+                "stage": row.get("stage"),
+                "model": row.get("model"),
+                "latency_ms": row.get("latency_ms"),
+                "prompt_template_id": row.get("prompt_template_id"),
+                "prompt_template_version": row.get("prompt_template_version"),
+                "system_prompt": row.get("system_prompt_rendered"),
+                "user_prompt": row.get("user_prompt_rendered"),
+                "context_manifest": row.get("context_manifest"),
+                "output": output if isinstance(output, str) else json.dumps(output, ensure_ascii=False, indent=2),
+            }
+        )
+
+    if api_error:
+        if database_path.exists():
+            try:
+                connection = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True)
+                connection.row_factory = sqlite3.Row
+                records = connection.execute(
+                    "SELECT model, latency_ms, detail, created_at FROM user_logs "
+                    "WHERE event_type = 'llm_call' ORDER BY id DESC LIMIT 5000"
+                ).fetchall()
+                connection.close()
+                for record in records:
+                    try:
+                        detail = json.loads(record["detail"]) if isinstance(record["detail"], str) else record["detail"]
+                    except json.JSONDecodeError:
+                        continue
+                    if not detail or detail.get("task_id") != task_id:
+                        continue
+                    output = detail.get("raw_output")
+                    if output in (None, "") and detail.get("error"):
+                        output = f"调用失败：{detail['error']}"
+                    if output in (None, ""):
+                        continue
+                    rows.append(
+                        {
+                            "prompt_call_id": detail.get("prompt_call_id"),
+                            "created_at": record["created_at"],
+                            "stage": detail.get("stage"),
+                            "model": record["model"],
+                            "latency_ms": record["latency_ms"],
+                            "prompt_template_id": detail.get("prompt_template_id"),
+                            "prompt_template_version": detail.get("prompt_template_version"),
+                            "system_prompt": detail.get("system_prompt_rendered"),
+                            "user_prompt": detail.get("user_prompt_rendered"),
+                            "context_manifest": detail.get("context_manifest"),
+                            "output": output if isinstance(output, str) else json.dumps(output, ensure_ascii=False, indent=2),
+                        }
+                    )
+            except sqlite3.Error:
+                rows = []
+    if not api_error:
+        rows.reverse()
+    return {
+        "connected": not api_error or database_path.exists(),
+        "status": "已读取当前模型输出" if rows else "等待生成结果",
+        "message": (
+            f"已找到 {len(rows)} 条与 {task_id} 关联的模型输出。"
+            if rows
+            else "该项尚未产生带任务编号的运行记录。请让 Codex 运行该项测试，完成后点击刷新。"
+        ),
+        "source": "local_database" if api_error else "local_api",
+        "error": api_error,
+        "outputs": rows,
+    }
+
+
 def friendly_status(raw: str) -> str:
     if "预填" in raw:
         return "等你确认"
@@ -243,6 +359,7 @@ def all_tasks() -> list[dict]:
                     "rag_rules": RAG_RULES if meta["kind"] == "hybrid" else [],
                     "result": result_for(task_id, row["primary_metric"]),
                     "feedback": feedback_status(task_id),
+                    "reference_standard": reference_standard(task_id),
                 }
             )
     return tasks
@@ -277,6 +394,13 @@ def get_feedback(task_id: str):
     return {"task_id": task_id, "saved": True, "feedback": json.loads(path.read_text("utf-8"))}
 
 
+@app.get("/api/outputs/{task_id}")
+def get_outputs(task_id: str):
+    if task_id not in {task["id"] for task in all_tasks()}:
+        raise HTTPException(404, "没有找到这项审核工作")
+    return {"task_id": task_id, **model_outputs(task_id)}
+
+
 @app.put("/api/feedback/{task_id}")
 def save_feedback(task_id: str, payload: FeedbackPayload):
     tasks = {task["id"]: task for task in all_tasks()}
@@ -284,6 +408,8 @@ def save_feedback(task_id: str, payload: FeedbackPayload):
         raise HTTPException(404, "没有找到这项审核工作")
     if tasks[task_id]["availability"] != "现在可以审核":
         raise HTTPException(409, "这项内容留到最后检查，当前不能填写")
+    if not payload.observed_output.strip() or not payload.output_ref.get("prompt_call_id"):
+        raise HTTPException(422, "尚未关联模型输出，不能提交审核")
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     saved_at = datetime.now(timezone.utc).isoformat()
     record = {

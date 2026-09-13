@@ -70,7 +70,7 @@ cd evaluation-workbench
 ./start.sh                 # http://127.0.0.1:8010
 ```
 
-工作台只读取测评资料并把反馈保存到自己的本地目录，不会修改 Prompt 或执行模型迭代。保存后回到 Codex，说明“读取工作台反馈并进行迭代”。
+工作台只读获取已经关联任务编号的模型输出、实际 Prompt 和上下文记录，并把人工反馈保存到自己的本地目录；不修改 ThesisFlow、Prompt 或模型。你无需复制粘贴输出，保存后回到 Codex，说明“读取工作台反馈并进行迭代”。
 
 测评请求可通过 `X-Evaluation-Run-Id` 和 `X-Evaluation-Task-Id` 请求头关联到具体运行与任务。每次生成式模型调用记录渲染后的 System Prompt、User Prompt、完整 messages、上下文清单、模型参数、输出、错误与哈希。
 
