@@ -1,0 +1,11 @@
+task_id,split,title,instruction,documents,primary_metric,gold_status
+R01,dev,Lost in the Middle核心发现,概括论文核心问题与主要发现并定位原文,D01,精读量表,已预填待人工确认
+R02,dev,Position Interpolation方法与局限,说明方法关键做法和至少一项局限,D06,方法与限制覆盖,待人工标注
+R03,dev,StreamingLLM机制,解释Attention Sinks机制及其能力边界,D05,结论正确性,待人工标注
+R04,dev,GraphRAG流程,说明local-to-global处理链路,D09,流程顺序与来源,待人工标注
+R05,dev,Self-RAG方法,说明Self-RAG中检索生成和反思机制,D10,方法覆盖,待人工标注
+R06,dev,评估框架边界,识别RAGAS不能直接证明的内容,D14,过度推断拒绝,待人工标注
+R07,dev,信息不足拒答,对文献中未提供的实验细节提问,D15,编造回答数,待人工标注
+R08,holdout,RULER与LongBench比较,比较两个基准测量的能力与不可直接类比之处,D03|D04,比较覆盖与边界,已锁定待后测
+R09,holdout,Self-RAG与CRAG比较,区分两者问题定义和修正机制,D10|D11,跨文献归属,已锁定待后测
+R10,holdout,结果原文定位,根据指定结果主张跳转并核对原文,D20,文献chunk页码定位,已锁定待后测

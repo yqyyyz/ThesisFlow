@@ -46,7 +46,7 @@ export default function Sidebar() {
             ThesisFlow
           </Link>
         </div>
-        <div className="mt-0.5 text-xs text-neutral-500">一站式科研工作台</div>
+        <div className="mt-0.5 text-xs text-neutral-500">AI 文献与写作工作台</div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
@@ -82,7 +82,14 @@ export default function Sidebar() {
                       : "text-neutral-700 hover:bg-neutral-100"
                   }`}
                 >
-                  <div className="truncate text-sm font-medium">{p.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-medium">{p.name}</span>
+                    {p.description?.startsWith("参考项目：") && (
+                      <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                        参考
+                      </span>
+                    )}
+                  </div>
                   <div className={`mt-0.5 text-[11px] ${active ? "text-blue-400" : "text-neutral-400"}`}>
                     {p.doc_count} 篇文献
                   </div>

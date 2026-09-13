@@ -11,6 +11,7 @@ export default function NewProjectModal() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [rq, setRq] = useState("");
+  const [criteria, setCriteria] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,10 +27,12 @@ export default function NewProjectModal() {
         body: JSON.stringify({
           name: name.trim(),
           research_question: rq.trim() || null,
+          screening_criteria: criteria.trim() || null,
         }),
       });
       setName("");
       setRq("");
+      setCriteria("");
       closeNewProject();
       router.refresh();
       router.push(`/projects/${p.id}`);
@@ -65,6 +68,16 @@ export default function NewProjectModal() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：平台治理中的算法偏见研究"
+              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-neutral-700">文献筛选标准（可选）</span>
+            <textarea
+              value={criteria}
+              onChange={(e) => setCriteria(e.target.value)}
+              rows={2}
+              placeholder="例如：纳入 2020 年后、有真实任务评测且报告成本或延迟的研究"
               className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             />
           </label>

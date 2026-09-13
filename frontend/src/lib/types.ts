@@ -4,6 +4,7 @@ export interface Project {
   name: string;
   description: string | null;
   research_question: string | null;
+  screening_criteria: string | null;
   stage: string;
   created_at: string;
   doc_count: number;
@@ -21,7 +22,8 @@ export interface DocumentItem {
   cited_by: number | null;
   status: string;
   error_msg: string | null;
-  scores: Record<string, { score: number; reason: string; user_edited?: boolean }> | null;
+  scores: Record<string, { score: number | null; reason: string; user_edited?: boolean }> | null;
+  reading_recommendation?: { status: string; reason: string } | null;
   weighted_score: number | null;
   summary_cache: string | null;
   created_at: string;

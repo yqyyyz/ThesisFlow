@@ -40,9 +40,9 @@ def _metrics(db: Session, project: Project) -> dict:
     docs = db.query(Document).filter(Document.project_id == project.id).all()
     ready = [d for d in docs if d.status == "ready"]
     scores = [
-        sum(v["score"] for v in (d.scores or {}).values()) / max(len(d.scores or {}), 1)
+        d.weighted_score
         for d in ready
-        if d.scores
+        if d.weighted_score is not None
     ]
     ann_count = (
         db.query(func.count(Annotation.id))
@@ -79,7 +79,17 @@ def generate_progress_summary(db: Session, project: Project) -> dict:
         "请用 2-3 句中文总结该项目的研究进展，并给出 1 条最关键的下一步建议。"
         "第一句概述当前进展，第二句指出薄弱环节，最后一句以『建议：』开头给出具体下一步。"
     )
-    text = chat("LIGHT", [{"role": "user", "content": prompt}], temperature=0.4)
+    text = chat(
+        "LIGHT",
+        [{"role": "user", "content": prompt}],
+        temperature=0.4,
+        trace={
+            "stage": "home_progress_summary",
+            "prompt_template_id": "home.progress",
+            "prompt_template_source": "app.services.home.generate_progress_summary",
+            "context_manifest": {"project_id": project.id, "signature": sig},
+        },
+    )
     result = {"signature": sig, "text": text.strip(), "metrics": m,
               "generated_at": datetime.now().isoformat()}
     project.progress_summary = result
@@ -97,7 +107,17 @@ def gen_insight_for_doc(db: Session, doc: Document) -> DomainInsight | None:
         "作为知识库的动态更新提示。直接输出提示文本，不要前缀。"
     )
     try:
-        content = chat("LIGHT", [{"role": "user", "content": prompt}], temperature=0.5)
+        content = chat(
+            "LIGHT",
+            [{"role": "user", "content": prompt}],
+            temperature=0.5,
+            trace={
+                "stage": "home_document_insight",
+                "prompt_template_id": "home.insight",
+                "prompt_template_source": "app.services.home.gen_insight_for_doc",
+                "context_manifest": {"document_id": doc.id},
+            },
+        )
     except Exception:
         return None
     insight = DomainInsight(

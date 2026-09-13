@@ -28,6 +28,7 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db)):
         name=payload.name,
         description=payload.description,
         research_question=payload.research_question,
+        screening_criteria=payload.screening_criteria,
         stage="topic",
     )
     db.add(project)
@@ -55,7 +56,7 @@ def update_project(project_id: int, payload: ProjectUpdate, db: Session = Depend
     project = db.get(Project, project_id)
     if not project:
         raise HTTPException(404, "项目不存在")
-    for field, value in payload.model_dump(exclude_none=True).items():
+    for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(project, field, value)
     db.commit()
     db.refresh(project)

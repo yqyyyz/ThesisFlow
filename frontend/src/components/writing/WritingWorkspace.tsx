@@ -60,6 +60,10 @@ interface ProposalVerify {
   chunk_key: string;
   status: string;
   score: number | null;
+  source_status: "exists" | "missing";
+  location_status: "located" | "missing" | "mismatch";
+  support_status: "supported" | "uncertain" | "unsupported" | "contradicted" | "not_checked";
+  reason?: string;
 }
 
 interface WritingMsg {
@@ -73,7 +77,9 @@ interface WritingMsg {
     reason?: string;
   };
   verify?: ProposalVerify[];
-  status?: "applied" | "rejected";
+  status?: "applied" | "rejected" | "expired" | "failed";
+  baseVersion?: string;
+  failureMessage?: string;
 }
 
 const DIMENSION_LABELS: Record<string, string> = {
@@ -169,7 +175,6 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
       } catch (e) {
         showToast((e as Error).message);
       }
-      api<Material[]>(`/api/drafts/0/materials`).catch(() => {});
     })();
   }, [projectId]);
 
@@ -197,6 +202,9 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
                   role: "assistant" as const,
                   content: p.type === "reply" ? p.content || "" : "",
                   proposal: p,
+                  status: p.type === "reply" ? undefined : "expired",
+                  failureMessage:
+                    p.type === "reply" ? undefined : "历史提案不再绑定当前文稿版本",
                 };
               }
             } catch {
@@ -237,7 +245,7 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
             .then(setSnapshots)
             .catch(() => {});
         } catch {
-          /* ignore */
+          showToast("自动保存失败，当前内容仍保留在编辑器中");
         }
       }, 1500);
     },
@@ -518,6 +526,7 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
     setWritingMessages((m) => [...m, { role: "user", content: msg }]);
     setWritingLoading(true);
     setGenStatus("AI 正在检索证据并生成提案…");
+    const baseVersion = JSON.stringify(editorRef.current?.getJSON() || null);
     try {
       const res = await api<{
         proposal_type: string;
@@ -550,6 +559,7 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
           content: res.proposal?.type === "reply" ? res.proposal.content || "" : "",
           proposal: res.proposal,
           verify: res.verify,
+          baseVersion,
         },
       ]);
       setGenStatus(
@@ -557,6 +567,7 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
       );
     } catch (e) {
       showToast((e as Error).message);
+      setWritingInput(msg);
       setGenStatus("");
     } finally {
       setWritingLoading(false);
@@ -569,6 +580,17 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
     if (!ed || !msg?.proposal) return;
     const { type, content, anchor_text, anchor_occurrence } = msg.proposal;
     if (type === "reply") return;
+    if (msg.baseVersion && msg.baseVersion !== JSON.stringify(ed.getJSON())) {
+      setWritingMessages((messages) =>
+        messages.map((item, index) =>
+          index === msgIdx
+            ? { ...item, status: "expired", failureMessage: "文稿在提案生成后已发生变化" }
+            : item
+        )
+      );
+      showToast("提案已过期：文稿发生变化，请重新生成");
+      return;
+    }
     const result = applyContentChange(ed, {
       type: type || "",
       anchor_text,
@@ -576,11 +598,30 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
       content,
     });
     if (!result.ok) {
+      setWritingMessages((messages) =>
+        messages.map((item, index) =>
+          index === msgIdx
+            ? { ...item, status: "failed", failureMessage: result.message }
+            : item
+        )
+      );
       showToast(result.message);
       return;
     }
     if (msg.verify && msg.verify.length) markCitationStatus(ed, msg.verify);
-    setWritingMessages((m) => m.map((x, i) => (i === msgIdx ? { ...x, status: "applied" } : x)));
+    setWritingMessages((messages) =>
+      messages.map((item, index) => {
+        if (index === msgIdx) return { ...item, status: "applied", failureMessage: undefined };
+        if (item.proposal && item.proposal.type !== "reply" && !item.status) {
+          return {
+            ...item,
+            status: "expired",
+            failureMessage: "另一项提案已写入，当前定位依据已变化",
+          };
+        }
+        return item;
+      })
+    );
     showToast(`已采纳：${result.message}`);
     if (draft) {
       api(`/api/drafts/${draft.id}/feedback`, {
@@ -1110,8 +1151,7 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
               )}
             </div>
             <p className="mt-1 text-[10px] text-neutral-400">
-              勾选素材后点击续写，AI 将优先引用这些高权重片段（已勾选{" "}
-              {selectedMaterials.size} 条）
+              标签决定用途：重点论据仍需核验，借鉴方法仅作方法参考，存疑材料不得作为肯定证据（已勾选{" "}{selectedMaterials.size} 条）
             </p>
             <div className="mt-2 space-y-2">
               {materials.length === 0 && (
@@ -1301,6 +1341,12 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
                           {m.status === "rejected" && (
                             <span className="text-[10px] font-medium text-neutral-500">已拒绝</span>
                           )}
+                          {m.status === "expired" && (
+                            <span className="text-[10px] font-medium text-amber-700">已过期，需重新生成</span>
+                          )}
+                          {m.status === "failed" && (
+                            <span className="text-[10px] font-medium text-red-600">定位或写入失败</span>
+                          )}
                         </div>
                         {m.proposal.reason && (
                           <div className="mt-1 text-[11px] text-neutral-500">
@@ -1325,37 +1371,35 @@ export default function WritingWorkspace({ projectId }: { projectId: string }) {
                           </div>
                         )}
                         {m.verify && m.verify.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
+                          <div className="mt-2 space-y-1.5">
                             {m.verify.map((v, vi) => (
-                              <span
-                                key={vi}
-                                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${
-                                  v.status === "normal"
-                                    ? "bg-blue-100 text-blue-700"
-                                    : v.status === "weak"
-                                      ? "bg-amber-100 text-amber-700"
-                                      : "bg-red-100 text-red-600 line-through"
-                                }`}
-                                title={
-                                  v.status === "normal"
-                                    ? "引用校验通过"
-                                    : v.status === "weak"
-                                      ? "语义支持较弱，建议人工核对"
-                                      : "引用无效（不在证据列表）"
-                                }
-                              >
-                                [{v.chunk_key}]
-                              </span>
+                              <div key={vi} className="flex flex-wrap items-center gap-1 text-[9px]">
+                                <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-neutral-600">[{v.chunk_key}]</span>
+                                <span className={`rounded px-1.5 py-0.5 ${v.source_status === "exists" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                                  来源{v.source_status === "exists" ? "存在" : "缺失"}
+                                </span>
+                                <span className={`rounded px-1.5 py-0.5 ${v.location_status === "located" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                                  {v.location_status === "located" ? "定位正确" : "定位失败"}
+                                </span>
+                                <span className={`rounded px-1.5 py-0.5 ${v.support_status === "supported" ? "bg-blue-100 text-blue-700" : v.support_status === "uncertain" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`} title={v.reason}>
+                                  {v.support_status === "supported" ? "支持主张" : v.support_status === "uncertain" ? "支持存疑" : v.support_status === "contradicted" ? "与主张冲突" : v.support_status === "not_checked" ? "未检查支持性" : "不支持主张"}
+                                </span>
+                              </div>
                             ))}
                           </div>
                         )}
-                        {!m.status && (
+                        {m.failureMessage && (
+                          <div className="mt-2 rounded bg-red-50 px-2 py-1 text-[10px] text-red-700">
+                            {m.failureMessage}。提案内容已保留。
+                          </div>
+                        )}
+                        {(!m.status || m.status === "failed") && (
                           <div className="mt-2.5 flex gap-2">
                             <button
                               onClick={() => applyProposal(i)}
                               className="rounded-lg bg-blue-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-blue-700"
                             >
-                              采纳并写入编辑器
+                              {m.status === "failed" ? "重试写入" : "采纳并写入编辑器"}
                             </button>
                             <button
                               onClick={() => rejectProposal(i)}

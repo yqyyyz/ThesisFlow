@@ -112,12 +112,12 @@ def list_documents(
     elif sort in ("quality", "relevance", "methodology", "novelty"):
         outs.sort(
             key=lambda o: -(
-                (o.scores or {}).get(sort, {}).get("score", 0) if o.scores else 0
+                ((o.scores or {}).get(sort, {}).get("score") or 0) if o.scores else 0
             )
         )
     result = []
     for o in outs:
-        folded = o.weighted_score is not None and o.weighted_score < fold_threshold
+        folded = o.status == "ready" and (o.reading_recommendation or {}).get("status") == "暂不优先" and o.weighted_score is not None and o.weighted_score < fold_threshold
         result.append(o.model_dump() | {"folded": folded})
     return {"view": view, "documents": result}
 
@@ -278,6 +278,14 @@ def rescore_document(document_id: int, db: Session = Depends(get_db)):
     if doc.cited_by is not None:
         meta_parts.append(f"被引量：{doc.cited_by}")
     rq = project.research_question if project else ""
+    from app.models.user import User
+
+    user = db.get(User, doc.user_id)
+    discipline_guidance = ""
+    if user:
+        from app.services.scoring import pick_anchor
+
+        discipline_guidance = pick_anchor(user.discipline)
     doc.scores = score_document(
         "\n".join(meta_parts),
         abstract,
@@ -285,9 +293,18 @@ def rescore_document(document_id: int, db: Session = Depends(get_db)):
         rq,
         all_dimensions(project),
         calibration=load_calibration_samples(db, doc.user_id),
+        screening_criteria=(project.screening_criteria or "") if project else "",
+        discipline_guidance=discipline_guidance,
     )
+    scores = dict(doc.scores)
+    doc.reading_recommendation = scores.pop("reading_recommendation")
+    doc.scores = scores
     db.commit()
-    return {"ok": True, "scores": doc.scores}
+    return {
+        "ok": True,
+        "scores": doc.scores,
+        "reading_recommendation": doc.reading_recommendation,
+    }
 
 
 @router.get("/documents/{document_id}/chunks/{chunk_key}/locate")

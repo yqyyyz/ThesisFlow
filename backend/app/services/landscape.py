@@ -23,7 +23,7 @@ def generate_landscape(db: Session, user_id: int = 1) -> tuple[str, list[int]]:
     for d in project_docs[:10]:
         if d.scores:
             doc_lines.append(
-                f"- [项目]《{d.title or d.file_name}》四维总分 {sum(v['score'] for v in d.scores.values())/4:.1f}"
+                f"- [项目]《{d.title or d.file_name}》四维总分 {d.weighted_score if d.weighted_score is not None else '信息不足'}"
             )
             source_ids.append(d.id)
 
@@ -55,7 +55,17 @@ def generate_landscape(db: Session, user_id: int = 1) -> tuple[str, list[int]]:
 用户研究偏好：
 {mem_lines}"""
 
-    report = chat("STRONG", [{"role": "user", "content": prompt}], temperature=0.5)
+    report = chat(
+        "STRONG",
+        [{"role": "user", "content": prompt}],
+        temperature=0.5,
+        trace={
+            "stage": "landscape_report",
+            "prompt_template_id": "landscape.report",
+            "prompt_template_source": "app.services.landscape.generate_landscape",
+            "context_manifest": {"document_ids": source_ids, "memory_count": len(memories)},
+        },
+    )
     return report, source_ids
 
 
@@ -96,7 +106,7 @@ def generate_landscape_graph(db: Session, user_id: int = 1) -> tuple[dict, list[
           "label": "子主题（短语）",
           "detail": "对该子方向研究进展的文字介绍，80-150 字，说明现状、代表工作与缺口",
           "related_doc_ids": [材料中与该子主题相关的文献 id，可为空数组],
-          "is_gap": true 或 false（是否为值得切入的研究缺口）
+          "is_gap": true 或 false（是否为当前资料范围内的候选研究问题）
         }}
       ]
     }}
@@ -104,11 +114,22 @@ def generate_landscape_graph(db: Session, user_id: int = 1) -> tuple[dict, list[
 }}
 
 要求：
-1. 主方向 3-5 个，每个主方向下 2-4 个子主题；
-2. 至少标注 2 个 is_gap=true 的研究缺口节点；
+1. 按材料充分程度组织主方向和子主题，不强制数量；
+2. is_gap=true 仅表示当前资料范围内的候选研究问题，不代表学界空白；必须有材料支持，允许零个；材料不足时 branches 可以为空；
 3. related_doc_ids 只能使用材料中出现过的 id，无关则留空；
 4. 只输出 JSON。"""
-    raw = chat("STRONG", [{"role": "user", "content": prompt}], temperature=0.4, json_mode=True)
+    raw = chat(
+        "STRONG",
+        [{"role": "user", "content": prompt}],
+        temperature=0.4,
+        json_mode=True,
+        trace={
+            "stage": "landscape_graph",
+            "prompt_template_id": "landscape.graph",
+            "prompt_template_source": "app.services.landscape.generate_landscape_graph",
+            "context_manifest": {"document_ids": source_ids},
+        },
+    )
     import json as _json
     import re as _re
 

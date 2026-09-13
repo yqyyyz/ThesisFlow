@@ -1,7 +1,8 @@
 import json
 from collections import Counter
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -10,6 +11,80 @@ from app.models.drafting import Citation
 from app.models.user import UserLog
 
 router = APIRouter(prefix="/api/observability", tags=["observability"])
+
+
+def _detail_dict(log: UserLog) -> dict:
+    detail = log.detail
+    if isinstance(detail, str):
+        try:
+            detail = json.loads(detail)
+        except json.JSONDecodeError:
+            detail = {}
+    return detail or {}
+
+
+@router.get("/prompt-calls")
+def export_prompt_calls(
+    run_id: str | None = None,
+    task_id: str | None = None,
+    stage: str | None = None,
+    include_content: bool = True,
+    limit: int = Query(default=5000, ge=1, le=20000),
+    db: Session = Depends(get_db),
+):
+    """导出可复现的 Prompt 调用 JSONL；原始内容仅用于本地受控测评。"""
+    logs = (
+        db.query(UserLog)
+        .filter(UserLog.event_type == "llm_call")
+        .order_by(UserLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    logs.reverse()
+    rows = []
+    for log in logs:
+        detail = dict(_detail_dict(log))
+        if not detail.get("prompt_call_id"):
+            continue
+        if run_id is not None and detail.get("run_id") != run_id:
+            continue
+        if task_id is not None and detail.get("task_id") != task_id:
+            continue
+        if stage is not None and detail.get("stage") != stage:
+            continue
+        if not include_content:
+            for key in (
+                "system_prompt_rendered",
+                "raw_user_instruction",
+                "user_prompt_rendered",
+                "messages",
+                "raw_output",
+                "parsed_output",
+            ):
+                detail.pop(key, None)
+        rows.append(
+            {
+                "log_id": log.id,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+                "slot": log.slot,
+                "model": log.model,
+                "prompt_tokens": log.prompt_tokens,
+                "completion_tokens": log.completion_tokens,
+                "latency_ms": log.latency_ms,
+                **detail,
+            }
+        )
+
+    def generate():
+        for row in rows:
+            yield json.dumps(row, ensure_ascii=False) + "\n"
+
+    filename = f"prompt_calls_{run_id or 'all'}.jsonl"
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/summary")
@@ -21,13 +96,7 @@ def summary(db: Session = Depends(get_db)):
     light_calls = [l for l in llm_calls if l.slot == "LIGHT"]
 
     def _detail(l) -> dict:
-        d = l.detail
-        if isinstance(d, str):
-            try:
-                d = json.loads(d)
-            except json.JSONDecodeError:
-                d = {}
-        return d or {}
+        return _detail_dict(l)
 
     ttft_values = [_detail(l).get("ttft_ms") for l in strong_calls]
     ttft_values = [v for v in ttft_values if isinstance(v, (int, float))]

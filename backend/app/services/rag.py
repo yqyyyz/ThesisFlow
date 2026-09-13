@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.llm import embed, rerank
 from app.core.vectors import blob_to_vec
-from app.models.literature import Chunk, Document
+from app.models.literature import Annotation, Chunk, Document
 from app.services.scoring import weighted_total
 
 TIER_WEIGHTS = {"top": 2.0, "mid": 1.2, "base": 0.8}
@@ -133,7 +133,8 @@ def retrieve(
             if chunk.tier >= 2:
                 return TIER_WEIGHTS["top"]
             doc = doc_of(chunk)
-            if doc and doc.scores and weighted_total(doc.scores) >= 4:
+            total = weighted_total(doc.scores) if doc and doc.scores else None
+            if total is not None and total >= 4:
                 return TIER_WEIGHTS["mid"]
             return TIER_WEIGHTS["base"]
 
@@ -176,6 +177,14 @@ def retrieve(
             continue
         used_chars += len(snippet)
         doc = doc_of(c)
+        annotation_labels = [
+            label
+            for (label,) in db.query(Annotation.tag_label)
+            .filter(Annotation.chunk_key == c.chunk_key, Annotation.tag_label.isnot(None))
+            .distinct()
+            .all()
+            if label
+        ]
         selected.append(
             {
                 "chunk_key": c.chunk_key,
@@ -185,6 +194,7 @@ def retrieve(
                 "page_no": c.page_no,
                 "tier": c.tier,
                 "content": snippet,
+                "annotation_labels": annotation_labels,
             }
         )
     return selected
@@ -193,10 +203,12 @@ def retrieve(
 def format_context_block(retrieved: list[dict]) -> str:
     lines = []
     for item in retrieved:
+        labels = item.get("annotation_labels") or []
+        usage = f" · 批注用途：{'、'.join(labels)}" if labels else ""
         lines.append(
             f"[{item['chunk_key']}] 《{item['doc_title']}》"
             f"{(' · ' + item['section_title']) if item['section_title'] else ''}"
-            f"{' · p.' + str(item['page_no']) if item['page_no'] else ''}\n{item['content']}"
+            f"{' · p.' + str(item['page_no']) if item['page_no'] else ''}{usage}\n{item['content']}"
         )
     return "\n\n".join(lines)
 

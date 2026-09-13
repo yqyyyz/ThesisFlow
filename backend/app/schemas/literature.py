@@ -8,12 +8,14 @@ class ProjectCreate(BaseModel):
     name: str
     description: str | None = None
     research_question: str | None = None
+    screening_criteria: str | None = None
 
 
 class ProjectUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     research_question: str | None = None
+    screening_criteria: str | None = None
     stage: str | None = None
 
 
@@ -23,6 +25,7 @@ class ProjectOut(BaseModel):
     name: str
     description: str | None
     research_question: str | None
+    screening_criteria: str | None
     stage: str
     created_at: datetime
     doc_count: int = 0
@@ -42,6 +45,7 @@ class DocumentOut(BaseModel):
     cited_by: int | None
     status: str
     error_msg: str | None
+    reading_recommendation: dict | None = None
     scores: dict | None
     weighted_score: float | None
     summary_cache: str | None

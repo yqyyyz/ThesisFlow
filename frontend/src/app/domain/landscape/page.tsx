@@ -102,7 +102,7 @@ export default function LandscapePage() {
                 <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-300" /> 主方向
               </span>
               <span className="flex items-center gap-1">
-                <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" /> 研究缺口（建议切入）
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" /> 候选研究问题（当前资料）
               </span>
               <span className="ml-auto">
                 生成于 {new Date(latest.created_at).toLocaleString("zh-CN")}
@@ -124,7 +124,7 @@ export default function LandscapePage() {
                   <h3 className="text-base font-bold text-neutral-800">{selected.label}</h3>
                   {selected.is_gap && (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                      研究缺口
+                      候选问题
                     </span>
                   )}
                 </div>

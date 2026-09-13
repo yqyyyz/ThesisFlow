@@ -61,7 +61,15 @@ def list_memories(status: str | None = None, db: Session = Depends(get_db)):
 def create_memory(payload: MemoryCreate, db: Session = Depends(get_db)):
     if payload.type not in ("explicit", "implicit"):
         raise HTTPException(422, "type 必须为 explicit / implicit")
-    stats = integrate_memories(db, [payload.content.strip()], source_ref="manual")
+    content = payload.content.strip()
+    if not content:
+        raise HTTPException(422, "记忆内容不能为空")
+    stats = integrate_memories(
+        db,
+        [content],
+        source_ref="manual",
+        memory_type=payload.type,
+    )
     _invalidate_caches(db)
     return {"ok": True, "stats": stats}
 
@@ -72,7 +80,10 @@ def update_memory(memory_id: int, payload: MemoryUpdate, db: Session = Depends(g
     if not mem:
         raise HTTPException(404, "记忆不存在")
     if payload.content is not None:
-        mem.content = payload.content
+        content = payload.content.strip()
+        if not content:
+            raise HTTPException(422, "记忆内容不能为空")
+        mem.content = content
     if payload.confidence is not None:
         mem.confidence = max(0.0, min(1.0, payload.confidence))
     if payload.conflict_resolution == "keep_new":

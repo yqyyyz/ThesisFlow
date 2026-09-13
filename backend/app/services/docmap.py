@@ -154,7 +154,21 @@ def _generate_map(db: Session, project: Project, docs: list[Document]) -> dict:
 3. relation 取值严格限定为 extends（扩展）/supports（支持）/contrasts（对照）/background（背景）/same_topic（同主题）；
 4. 只输出 JSON。"""
 
-    raw = chat("STRONG", [{"role": "user", "content": prompt}], temperature=0.4, json_mode=True)
+    raw = chat(
+        "STRONG",
+        [{"role": "user", "content": prompt}],
+        temperature=0.4,
+        json_mode=True,
+        trace={
+            "stage": "document_map",
+            "prompt_template_id": "docmap.generate",
+            "prompt_template_source": "app.services.docmap._generate_map",
+            "context_manifest": {
+                "project_id": project.id,
+                "document_ids": [d.id for d in docs],
+            },
+        },
+    )
     m = re.search(r"\{.*\}", raw, re.S)
     try:
         result = json.loads(m.group(0)) if m else {}
@@ -182,7 +196,7 @@ def _generate_map(db: Session, project: Project, docs: list[Document]) -> dict:
             "venue": d.venue,
             "year": d.year,
             "weighted_score": (
-                sum(v["score"] for v in d.scores.values()) / max(len(d.scores), 1)
+                d.weighted_score
                 if d.scores
                 else None
             ),
@@ -325,7 +339,18 @@ def deep_extract_edges(db: Session, project: Project, query: str) -> dict:
 
 要求：只输出确有依据的关系，不超过 6 条；无关系则输出空数组。"""
     try:
-        raw = _chat("STRONG", [{"role": "user", "content": prompt}], temperature=0.2, json_mode=True)
+        raw = _chat(
+            "STRONG",
+            [{"role": "user", "content": prompt}],
+            temperature=0.2,
+            json_mode=True,
+            trace={
+                "stage": "document_map_delta",
+                "prompt_template_id": "docmap.delta",
+                "prompt_template_source": "app.services.docmap._generate_delta_edges",
+                "context_manifest": {"document_ids": chosen},
+            },
+        )
         m = _re.search(r"\[.*\]", raw, _re.S)
         edges_parsed = json.loads(m.group(0)) if m else []
     except Exception:

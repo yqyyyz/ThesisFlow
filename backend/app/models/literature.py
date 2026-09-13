@@ -34,6 +34,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     research_question: Mapped[str | None] = mapped_column(Text, nullable=True)
+    screening_criteria: Mapped[str | None] = mapped_column(Text, nullable=True)
     stage: Mapped[str] = mapped_column(String(24), default="topic")
     discipline_profile: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     progress_summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -65,6 +66,7 @@ class Document(Base):
     status: Mapped[str] = mapped_column(String(24), default="uploaded", index=True)
     error_msg: Mapped[str | None] = mapped_column(Text, nullable=True)
     scores: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    reading_recommendation: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     summary_cache: Mapped[str | None] = mapped_column(Text, nullable=True)
     title_embedding: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     word_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -78,7 +80,7 @@ class Document(Base):
         if not self.scores:
             return None
         dims = ("quality", "relevance", "methodology", "novelty")
-        vals = [self.scores[d]["score"] for d in dims if d in self.scores]
+        vals = [self.scores[d]["score"] for d in dims if d in self.scores and isinstance(self.scores[d].get("score"), (int, float))]
         return sum(vals) / len(vals) if vals else None
 
 

@@ -1,6 +1,7 @@
 import re
 from collections.abc import Iterator
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -51,11 +52,15 @@ class CitationParser:
             self.buffer = ""
 
 
-def build_system_prompt(db: Session, user_id: int = 1) -> str:
+def build_system_prompt(
+    db: Session, user_id: int = 1, project_id: int | None = None
+) -> str:
     user = db.get(User, user_id)
     base = (
         "你是资深学术审稿人与科研协作者，表达严谨、客观、克制，"
         "优先依据证据而非修辞，绝不编造引用与结论。"
+        "当前明确指令优先于历史偏好；记忆仅用于适用的任务，不把其他项目背景当作本项目事实。"
+        "批注用途：重点论据仅为候选支持证据，仍需核验；借鉴方法仅用于方法参考；存疑/存疑之处用于争议与限制，不得当作肯定证据；背景/背景知识用于定义与背景说明。"
     )
     if not user:
         return base
@@ -64,13 +69,20 @@ def build_system_prompt(db: Session, user_id: int = 1) -> str:
         f"{'/' + user.sub_discipline if user.sub_discipline else ''}；"
         f"引用规范偏好：{user.citation_style}；写作语言：{user.language_pref}。"
     )
-    memories = (
-        db.query(DomainMemory)
-        .filter(DomainMemory.user_id == user_id, DomainMemory.status == "active")
-        .order_by(DomainMemory.confidence.desc(), DomainMemory.id.asc())
-        .limit(10)
-        .all()
+    memory_query = db.query(DomainMemory).filter(
+        DomainMemory.user_id == user_id, DomainMemory.status == "active"
     )
+    if project_id is not None:
+        memory_query = memory_query.filter(
+            or_(
+                DomainMemory.source_ref.is_(None),
+                ~DomainMemory.source_ref.like("project:%"),
+                DomainMemory.source_ref == f"project:{project_id}",
+            )
+        )
+    memories = memory_query.order_by(
+        DomainMemory.confidence.desc(), DomainMemory.id.asc()
+    ).limit(10).all()
     mem_lines = "\n".join(
         f"- {m.content}（置信度 {round(m.confidence, 2):.2f}）" for m in memories
     )
@@ -89,7 +101,7 @@ def continue_stream(
     evidence_keys: list[str],
     drafting_context: str | None = None,
 ) -> Iterator[tuple[str, str]]:
-    system = build_system_prompt(db, 1)
+    system = build_system_prompt(db, 1, draft.project_id)
     user = db.get(User, 1)
     citation_style = user.citation_style if user else "APA"
     user_prompt = writing_strong_prompt(
@@ -107,7 +119,26 @@ def continue_stream(
     ]
     parser = CitationParser()
     full_text_parts: list[str] = []
-    for delta in chat_stream("STRONG", messages, temperature=0.4):
+    for delta in chat_stream(
+        "STRONG",
+        messages,
+        temperature=0.4,
+        trace={
+            "stage": "writing_continue",
+            "prompt_template_id": "writing.continue",
+            "prompt_template_source": "app.prompts.templates.writing_strong_prompt",
+            "raw_user_instruction": instruction,
+            "context_manifest": {
+                "draft_id": draft.id,
+                "project_id": draft.project_id,
+                "outline_path": outline_path,
+                "window_chars": len(window_text or ""),
+                "selected_note_chars": len(selected_notes or ""),
+                "chunk_keys": evidence_keys,
+                "drafting_context_chars": len(drafting_context or ""),
+            },
+        },
+    ):
         for kind, payload in parser.feed(delta):
             if kind == "text" and payload:
                 full_text_parts.append(payload)

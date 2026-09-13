@@ -182,6 +182,15 @@ def _run_pipeline_sync(db, doc: Document) -> None:
                         }
                     ],
                     temperature=0.1,
+                    trace={
+                        "stage": "document_title_refinement",
+                        "prompt_template_id": "ingestion.title_refinement",
+                        "prompt_template_source": "app.services.ingestion.run_pipeline",
+                        "context_manifest": {
+                            "document_id": doc.id,
+                            "source_chars": min(len(result.full_text), 800),
+                        },
+                    },
                 ).strip().strip('"').strip()
                 if 4 < len(refined) < 300 and "\n" not in refined:
                     doc.title = refined
@@ -283,15 +292,13 @@ def _run_pipeline_sync(db, doc: Document) -> None:
     conclusion = next((c.content for c in chunks if c.typed_label == "conclusion"), "")
     meta = _format_meta(doc)
 
-    profile_anchor = ""
+    discipline_guidance = ""
     user = db.get(User, doc.user_id)
     if user:
         from app.services.scoring import pick_anchor
 
-        profile_anchor = pick_anchor(user.discipline)
+        discipline_guidance = pick_anchor(user.discipline)
     research_question = project.research_question if project else ""
-    if profile_anchor:
-        research_question = f"{profile_anchor}\n{research_question}"
 
     from app.services.scoring import load_calibration_samples
 
@@ -302,7 +309,12 @@ def _run_pipeline_sync(db, doc: Document) -> None:
         research_question,
         all_dimensions(project),
         calibration=load_calibration_samples(db, doc.user_id),
+        screening_criteria=(project.screening_criteria or "") if project else "",
+        discipline_guidance=discipline_guidance,
     )
+    scores = dict(doc.scores)
+    doc.reading_recommendation = scores.pop("reading_recommendation")
+    doc.scores = scores
     if abstract:
         doc.summary_cache = abstract[:1000]
     doc.status = "ready"

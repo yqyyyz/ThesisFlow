@@ -141,6 +141,15 @@ def get_draft(draft_id: int, db: Session = Depends(get_db)):
 def update_draft(draft_id: int, payload: DraftUpdate, db: Session = Depends(get_db)):
     draft = _get_draft(db, draft_id)
     update = payload.model_dump(exclude_none=True)
+    previous_content = draft.content_json
+    if payload.content_json is not None and payload.content_json != previous_content:
+        db.add(
+            DraftSnapshot(
+                draft_id=draft.id,
+                content_json=previous_content,
+                note="自动保存前",
+            )
+        )
     for field, value in update.items():
         setattr(draft, field, value)
     if payload.content_json is not None:
@@ -155,11 +164,6 @@ def update_draft(draft_id: int, payload: DraftUpdate, db: Session = Depends(get_
             return n
 
         draft.word_count = count_text(payload.content_json.get("content", []))
-        db.add(
-            DraftSnapshot(
-                draft_id=draft.id, content_json=draft.content_json, note="自动保存"
-            )
-        )
     db.commit()
     db.refresh(draft)
     return draft
@@ -290,15 +294,27 @@ def continue_writing(draft_id: int, payload: ContinueRequest, db: Session = Depe
 
 @router.post("/drafts/{draft_id}/edit-action")
 def edit_action(draft_id: int, payload: EditActionRequest, db: Session = Depends(get_db)):
-    _get_draft(db, draft_id)
+    draft = _get_draft(db, draft_id)
     if payload.action not in ("polish", "rewrite", "logic"):
         raise HTTPException(422, "action 必须为 polish / rewrite / logic")
-    system = build_system_prompt(db, 1)
+    system = build_system_prompt(db, 1, draft.project_id)
     user_prompt = edit_action_prompt(payload.action, payload.selection, payload.extra_instruction)
     result = chat(
         "STRONG",
         [{"role": "system", "content": system}, {"role": "user", "content": user_prompt}],
         temperature=0.4,
+        trace={
+            "stage": "writing_edit_action",
+            "prompt_template_id": "writing.edit_action",
+            "prompt_template_source": "app.prompts.templates.edit_action_prompt",
+            "raw_user_instruction": payload.extra_instruction,
+            "context_manifest": {
+                "draft_id": draft_id,
+                "project_id": draft.project_id,
+                "action": payload.action,
+                "selection_chars": len(payload.selection),
+            },
+        },
     )
     return {"action": payload.action, "result": result}
 
@@ -323,6 +339,12 @@ def review(draft_id: int, payload: ReviewRequest, db: Session = Depends(get_db))
         ],
         temperature=0.3,
         json_mode=True,
+        trace={
+            "stage": "writing_review",
+            "prompt_template_id": "review.generate",
+            "prompt_template_source": "app.prompts.templates.review_prompt_v2",
+            "context_manifest": {"draft_id": draft_id, "review_text_chars": len(text[:8000])},
+        },
     )
     import re as _re
 
@@ -394,12 +416,12 @@ def drafting_chat(project_id: int, payload: dict, db: Session = Depends(get_db))
     for d in db.query(Document).filter(Document.project_id == project_id).limit(12):
         if d.scores:
             summaries.append(
-                f"- 《{d.title}》四维总分 {sum(v['score'] for v in d.scores.values())/4:.1f}："
+                f"- 《{d.title}》四维总分 {d.weighted_score if d.weighted_score is not None else '信息不足'}："
                 f"{(d.summary_cache or '')[:150]}"
             )
     history = payload.get("history", [])[-10:]
     messages = [
-        {"role": "system", "content": build_system_prompt(db, 1)},
+        {"role": "system", "content": build_system_prompt(db, 1, project_id)},
         {
             "role": "user",
             "content": drafting_chat_prompt(
@@ -409,7 +431,22 @@ def drafting_chat(project_id: int, payload: dict, db: Session = Depends(get_db))
     ]
     messages.extend({"role": h["role"], "content": h["content"]} for h in history)
     messages.append({"role": "user", "content": payload.get("message", "")})
-    reply = chat("STRONG", messages, temperature=0.6)
+    reply = chat(
+        "STRONG",
+        messages,
+        temperature=0.6,
+        trace={
+            "stage": "drafting_chat",
+            "prompt_template_id": "drafting.chat",
+            "prompt_template_source": "app.prompts.templates.drafting_chat_prompt",
+            "raw_user_instruction": payload.get("message", ""),
+            "context_manifest": {
+                "project_id": project_id,
+                "document_summary_count": len(summaries),
+                "history_turns": len(history),
+            },
+        },
+    )
 
     session = _get_chat_session(db, project_id)
     db.add(ChatMessage(session_id=session.id, role="user",
@@ -455,7 +492,21 @@ def drafting_outline(project_id: int, payload: dict, db: Session = Depends(get_d
 - 用 # 表示一级章节标题，## 表示二级小节
 - 每个章节下用 - 列出 2-4 个要点
 - 4-7 个章节，要点紧扣商讨中达成的共识"""
-    raw = chat("STRONG", [{"role": "user", "content": prompt}], temperature=0.3)
+    raw = chat(
+        "STRONG",
+        [{"role": "user", "content": prompt}],
+        temperature=0.3,
+        trace={
+            "stage": "drafting_outline",
+            "prompt_template_id": "drafting.outline",
+            "prompt_template_source": "app.api.writing.drafting_outline",
+            "context_manifest": {
+                "project_id": project_id,
+                "history_turns": len(history[-16:]),
+                "conversation_chars": len(conversation),
+            },
+        },
+    )
     md = raw.strip().strip("`").strip()
     if md.startswith("markdown"):
         md = md[len("markdown"):].strip()
@@ -522,6 +573,7 @@ def writing_chat(draft_id: int, payload: dict, db: Session = Depends(get_db)):
                         "page_no": n.page_no,
                         "tier": 2,
                         "content": content[:1200],
+                        "annotation_labels": [n.tag_label] if n.tag_label else [],
                     },
                 )
     retrieved = retrieved[:10]
@@ -554,7 +606,7 @@ def writing_chat(draft_id: int, payload: dict, db: Session = Depends(get_db)):
         message,
         citation_style,
     )
-    system_prompt = build_system_prompt(db, 1)
+    system_prompt = build_system_prompt(db, 1, draft.project_id)
     messages = [{"role": "system", "content": system_prompt}]
     for h in history:
         r = h.get("role", "user")
@@ -570,6 +622,24 @@ def writing_chat(draft_id: int, payload: dict, db: Session = Depends(get_db)):
         temperature=0.4,
         json_mode=True,
         metric_prefix=system_prompt,
+        trace={
+            "stage": "writing_proposal",
+            "prompt_template_id": "writing.proposal",
+            "prompt_template_source": "app.prompts.templates.writing_chat_prompt",
+            "raw_user_instruction": message,
+            "context_manifest": {
+                "draft_id": draft_id,
+                "project_id": draft.project_id,
+                "intent": intent_info["intent"],
+                "route": routed["route"],
+                "chunk_keys": evidence_keys,
+                "selected_note_keys": payload.get("selected_note_keys", []),
+                "history_turns": len(history),
+                "editor_chars": len(editor_text),
+                "selection_chars": len(selection),
+                "drafting_context_chars": len(drafting_context),
+            },
+        },
     )
     import re as _re
 
@@ -651,6 +721,16 @@ def review_apply(draft_id: int, payload: dict, db: Session = Depends(get_db)):
             "STRONG",
             [{"role": "user", "content": review_fix_prompt(base, issue, suggestion)}],
             temperature=0.3,
+            trace={
+                "stage": "review_fix",
+                "prompt_template_id": "review.fix",
+                "prompt_template_source": "app.prompts.templates.review_fix_prompt",
+                "context_manifest": {
+                    "draft_id": draft_id,
+                    "anchor_chars": len(base),
+                    "issue": issue,
+                },
+            },
         ).strip()
         fixed = _clean_placeholders(fixed)
         fixed = _strip_append_numbering(fixed)
@@ -664,6 +744,16 @@ def review_apply(draft_id: int, payload: dict, db: Session = Depends(get_db)):
                 [{"role": "user", "content": review_check_prompt(base, fixed, issue)}],
                 temperature=0.1,
                 json_mode=True,
+                trace={
+                    "stage": "review_check",
+                    "prompt_template_id": "review.check",
+                    "prompt_template_source": "app.prompts.templates.review_check_prompt",
+                    "context_manifest": {
+                        "draft_id": draft_id,
+                        "anchor_chars": len(base),
+                        "fixed_chars": len(fixed),
+                    },
+                },
             )
             m = _re.search(r"\{.*\}", raw, _re.S)
             if m:

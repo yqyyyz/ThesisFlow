@@ -58,6 +58,21 @@ def pre_read(document_id: int, db: Session = Depends(get_db)):
             parsed = json.loads(markdown)
             if isinstance(parsed, dict):
                 structured = parsed
+                if not structured.get("reading_focus"):
+                    candidates = [
+                        *(structured.get("methods") or [])[:1],
+                        *(structured.get("conclusions") or [])[:1],
+                        structured.get("limitations"),
+                    ]
+                    structured["reading_focus"] = [
+                        f"核对原文中的{str(item).strip()}"
+                        for item in candidates
+                        if str(item or "").strip()
+                    ][:3]
+                    doc.summary_cache = PREREAD_SENTINEL + json.dumps(
+                        structured, ensure_ascii=False
+                    )
+                    db.commit()
                 markdown = ""
         except json.JSONDecodeError:
             pass
@@ -244,7 +259,7 @@ def reading_chat(document_id: int, payload: dict, db: Session = Depends(get_db))
         )
 
     history = payload.get("history", [])[-6:]
-    system_prompt = build_system_prompt(db, 1)
+    system_prompt = build_system_prompt(db, 1, doc.project_id)
     messages = [
         {"role": "system", "content": system_prompt},
         {
@@ -259,7 +274,24 @@ def reading_chat(document_id: int, payload: dict, db: Session = Depends(get_db))
     ]
     messages.extend({"role": h.get("role", "user"), "content": h.get("content", "")} for h in history)
     messages.append({"role": "user", "content": message})
-    reply = chat("STRONG", messages, temperature=0.4, metric_prefix=system_prompt)
+    reply = chat(
+        "STRONG",
+        messages,
+        temperature=0.4,
+        metric_prefix=system_prompt,
+        trace={
+            "stage": "reading_chat",
+            "prompt_template_id": "reading.evidence_chat",
+            "prompt_template_source": "app.api.reading.reading_chat",
+            "raw_user_instruction": message,
+            "context_manifest": {
+                "document_id": document_id,
+                "chunk_keys": [c.chunk_key for c in retrieved],
+                "history_turns": len(history),
+                "top_k": 4,
+            },
+        },
+    )
     set_result(
         db,
         scope,

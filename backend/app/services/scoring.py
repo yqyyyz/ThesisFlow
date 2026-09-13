@@ -77,11 +77,11 @@ def _extract_json(text: str) -> dict | None:
         return None
 
 
-def _coerce_score(value) -> int:
+def _coerce_score(value) -> int | None:
     try:
         score = int(round(float(value)))
-    except (TypeError, ValueError):
-        return 3
+    except (TypeError, ValueError, OverflowError):
+        return None
     return max(1, min(5, score))
 
 
@@ -135,6 +135,8 @@ def score_document(
     research_question: str,
     dimensions: list[dict] | None = None,
     calibration: list[dict] | None = None,
+    screening_criteria: str = "",
+    discipline_guidance: str = "",
 ) -> dict:
     dims = dimensions or BUILTIN_DIMENSIONS
     dim_lines = "\n".join(f"- {d['key']}（{d['name']}）：{d['desc']}" for d in dims)
@@ -142,6 +144,12 @@ def score_document(
         f'"{d["key"]}": {{"score": 0, "reason": ""}}' for d in dims
     )
     prompt = f"""请依据以下文献信息，从给定维度对该文献进行 1-5 分的整数打分，并给出每个维度的简要理由（每条不超过 40 字）。
+
+缺失的期刊、引用量等信息不得猜测；无法判断的维度 score 为 null，并说明缺少什么。
+额外输出 reading_recommendation：status 为「推荐精读」「暂不优先」「信息不足」，reason 为具体推荐理由。
+结合研究问题、筛选标准与内容独立判断精读优先级，禁止依据加权总分阈值决定。研究问题或内容不足以判断时用「信息不足」。
+筛选标准：{screening_criteria or "（未设置）"}
+学科评分参考：{discipline_guidance or "（通用标准）"}
 
 评分维度：
 {dim_lines}
@@ -160,8 +168,24 @@ def score_document(
 {_calibration_block(calibration)}
 
 只输出一个 JSON 对象，不要输出其他内容，格式如下：
-{{{json_shape}}}"""
-    raw = chat("LIGHT", [{"role": "user", "content": prompt}], temperature=0.1, json_mode=True)
+{{{json_shape}, "reading_recommendation": {{"status": "信息不足", "reason": ""}}}}"""
+    raw = chat(
+        "LIGHT",
+        [{"role": "user", "content": prompt}],
+        temperature=0.1,
+        json_mode=True,
+        trace={
+            "stage": "screening_scoring_recommendation",
+            "prompt_template_id": "screening.score_and_recommend",
+            "prompt_template_source": "app.services.scoring.score_document",
+            "context_manifest": {
+                "research_question": research_question,
+                "screening_criteria": screening_criteria,
+                "dimensions": [d["key"] for d in dims],
+                "calibration_count": len(calibration or []),
+            },
+        },
+    )
     parsed = _extract_json(raw) or {}
     result = {}
     for d in dims:
@@ -173,14 +197,20 @@ def score_document(
             }
         else:
             result[d["key"]] = {"score": _coerce_score(item), "reason": ""}
+    recommendation = parsed.get("reading_recommendation")
+    if not isinstance(recommendation, dict) or recommendation.get("status") not in ("推荐精读", "暂不优先", "信息不足") or not str(recommendation.get("reason") or "").strip():
+        recommendation = {"status": "信息不足", "reason": "未获得有效建议，请补充材料后重新评估"}
+    if not research_question.strip() or not (abstract.strip() or conclusion.strip()):
+        recommendation = {"status": "信息不足", "reason": "研究问题或文献内容不足，请补充后重新评估"}
+    result["reading_recommendation"] = {"status": recommendation["status"], "reason": str(recommendation["reason"])[:500]}
     return result
 
 
-def weighted_total(scores: dict, weights: dict | None = None) -> float:
+def weighted_total(scores: dict, weights: dict | None = None) -> float | None:
     weights = weights or {}
-    keys = [k for k in scores.keys()]
+    keys = [k for k, v in scores.items() if isinstance(v, dict) and isinstance(v.get("score"), (int, float)) and weights.get(k, 0.25) > 0]
     if not keys:
-        return 0.0
+        return None
     total_w = sum(weights.get(k, 0.25) for k in keys) or 1.0
     acc = 0.0
     for k in keys:

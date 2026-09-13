@@ -5,8 +5,8 @@ import SettingsModal from "@/components/SettingsModal";
 import NewProjectModal from "@/components/NewProjectModal";
 
 export const metadata: Metadata = {
-  title: "ThesisFlow - 一站式科研工作台",
-  description: "科研协作智能体：文献管理、沉浸式精读、引用溯源写作与长效记忆",
+  title: "ThesisFlow - AI 文献与写作工作台",
+  description: "支持文献筛选、沉浸式精读与可控人机协作写作",
 };
 
 export default function RootLayout(props: LayoutProps<"/">) {

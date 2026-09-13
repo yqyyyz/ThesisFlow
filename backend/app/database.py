@@ -45,6 +45,12 @@ def init_db() -> None:
 
     with engine.begin() as conn:
         Base.metadata.create_all(conn)
+        document_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(documents)"))}
+        if "reading_recommendation" not in document_columns:
+            conn.execute(text("ALTER TABLE documents ADD COLUMN reading_recommendation JSON"))
+        project_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(projects)"))}
+        if "screening_criteria" not in project_columns:
+            conn.execute(text("ALTER TABLE projects ADD COLUMN screening_criteria TEXT"))
         init_fts(conn)
 
 

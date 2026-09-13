@@ -19,6 +19,15 @@ def extract_candidates(conversation: str) -> list[str]:
         [{"role": "user", "content": memory_extract_prompt(conversation[-6000:])}],
         temperature=0.1,
         json_mode=True,
+        trace={
+            "stage": "memory_extraction",
+            "prompt_template_id": "memory.extract",
+            "prompt_template_source": "app.prompts.templates.memory_extract_prompt",
+            "context_manifest": {
+                "conversation_chars": len(conversation),
+                "kept_chars": len(conversation[-6000:]),
+            },
+        },
     )
     try:
         parsed = json.loads(raw)
@@ -36,7 +45,12 @@ def extract_candidates(conversation: str) -> list[str]:
         return []
 
 
-def integrate_memories(db: Session, candidates: list[str], source_ref: str) -> dict:
+def integrate_memories(
+    db: Session,
+    candidates: list[str],
+    source_ref: str,
+    memory_type: str = "implicit",
+) -> dict:
     stats = {"merged": 0, "conflicts": 0, "created": 0}
     existing = (
         db.query(DomainMemory)
@@ -78,7 +92,7 @@ def integrate_memories(db: Session, candidates: list[str], source_ref: str) -> d
             mem = DomainMemory(
                 user_id=1,
                 content=cand,
-                type="implicit",
+                type=memory_type,
                 confidence=0.5,
                 last_triggered_at=datetime.now(),
                 trigger_count=1,
@@ -92,7 +106,7 @@ def integrate_memories(db: Session, candidates: list[str], source_ref: str) -> d
             mem = DomainMemory(
                 user_id=1,
                 content=cand,
-                type="implicit",
+                type=memory_type,
                 confidence=0.5,
                 last_triggered_at=datetime.now(),
                 trigger_count=1,

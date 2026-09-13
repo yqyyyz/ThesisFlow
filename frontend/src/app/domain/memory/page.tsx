@@ -83,13 +83,24 @@ export default function MemoryPage() {
     await loadMemories();
   };
 
+  const editMemory = async (memory: Memory) => {
+    const content = window.prompt("修改记忆：", memory.content)?.trim();
+    if (!content || content === memory.content) return;
+    await api(`/api/memory/${memory.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ content }),
+    });
+    await loadMemories();
+    showToast("记忆已更新");
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-8 py-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">个人记忆库</h1>
           <p className="mt-1 text-sm text-neutral-500">
-            系统沉淀的研究偏好与长效知识，越用越懂你的学术脉络
+            管理个人偏好与研究背景；当前明确指令始终优先
           </p>
         </div>
         <button
@@ -189,8 +200,15 @@ export default function MemoryPage() {
                 </span>
               )}
               <button
+                onClick={() => editMemory(m)}
+                className="ml-auto text-neutral-300 hover:text-blue-600"
+                title="编辑记忆"
+              >
+                ✎
+              </button>
+              <button
                 onClick={() => deleteMemory(m.id)}
-                className="ml-auto text-neutral-300 hover:text-red-500"
+                className="text-neutral-300 hover:text-red-500"
               >
                 ✕
               </button>

@@ -1,0 +1,25 @@
+doc_id,arxiv_id,title,topic_group,file_type,expected_relevance,priority_label,split,parse_status,gold_status
+D01,2307.03172,Lost in the Middle: How Language Models Use Long Contexts,长上下文核心,PDF,高,推荐精读,dev,待试评,待人工确认
+D02,2402.13753,LongRoPE: Extending LLM Context Window Beyond 2 Million Tokens,长上下文核心,PDF,高,推荐精读,holdout,待试评,待人工标注
+D03,2404.06654,RULER: What's the Real Context Size of Your Long-Context Language Models?,长上下文核心,PDF,高,推荐精读,dev,待试评,待人工标注
+D04,2308.14508,LongBench: A Bilingual Multitask Benchmark for Long Context Understanding,长上下文核心,PDF,高,推荐精读,holdout,待试评,待人工标注
+D05,2309.17453,Efficient Streaming Language Models with Attention Sinks,长上下文核心,PDF,高,推荐精读,dev,待试评,待人工标注
+D06,2306.15595,Extending Context Window of Large Language Models via Positional Interpolation,长上下文核心,PDF,高,推荐精读,dev,待试评,待人工标注
+D07,2402.14848,"Same Task, More Tokens: the Impact of Input Length on the Reasoning Performance of Large Language Models",长上下文核心,PDF,中,推荐精读,dev,待试评,待人工标注
+D08,2312.10997,Retrieval-Augmented Generation for Large Language Models: A Survey,RAG与GraphRAG,PDF,中,推荐精读,dev,待试评,待人工标注
+D09,2404.16130,From Local to Global: A Graph RAG Approach to Query-Focused Summarization,RAG与GraphRAG,PDF,高,推荐精读,dev,待试评,待人工标注
+D10,2310.11511,Self-RAG: Learning to Retrieve Generate and Critique through Self-Reflection,RAG与GraphRAG,PDF,高,推荐精读,dev,待试评,待人工标注
+D11,2401.15884,Corrective Retrieval Augmented Generation,RAG与GraphRAG,PDF,高,推荐精读,holdout,待试评,待人工标注
+D12,2410.05779,LightRAG: Simple and Fast Retrieval-Augmented Generation,RAG与GraphRAG,PDF,中,推荐精读,dev,待试评,待人工标注
+D13,2005.11401,Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,RAG与GraphRAG,PDF,高,推荐精读,dev,待试评,待人工标注
+D14,2309.15217,Ragas: Automated Evaluation of Retrieval Augmented Generation,评估与校验,PDF,中,推荐精读,dev,待试评,待人工标注
+D15,2303.08896,SelfCheckGPT: Zero-Resource Black-Box Hallucination Detection for Generative Large Language Models,评估与校验,PDF,中,推荐精读,dev,待试评,待人工标注
+D16,2305.14251,FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation,评估与校验,PDF,中,推荐精读,holdout,待试评,待人工标注
+D17,2311.05232,A Survey on Hallucination in Large Language Models,评估与校验,PDF,中,推荐精读,dev,待试评,待人工标注
+D18,2404.13501,A Survey on the Memory Mechanism of Large Language Model based Agents,Agent记忆与效率,PDF,中,推荐精读,holdout,待试评,待人工标注
+D19,2404.14294,A Survey on Efficient Inference for Large Language Models,Agent记忆与效率,PDF,中,推荐精读,dev,待试评,待人工标注
+D20,2307.11088,L-Eval: Instituting Standardized Evaluation for Long Context Language Models,长上下文评测,PDF,高,推荐精读,holdout,待试评,待人工标注
+D21,2205.05897,CAGI Critical Assessment of Genome Interpretation,低相关对照,PDF,低,暂不优先,dev,待试评,待人工标注
+D22,2302.11439,Gd-rich Precipitates Martensitic Transformation and Magnetocaloric Effect,低相关对照,PDF,低,暂不优先,holdout,待试评,待人工标注
+D23,1702.05149,Curvature Effects in Turbulent Premixed Flames DNS Study,低相关对照,Markdown,低,暂不优先,dev,待试评,待人工标注
+D24,2002.07310,Neutral Hydrogen in Nearby Dwarf Galaxies,低相关对照,Word,低,暂不优先,holdout,待试评,待人工标注

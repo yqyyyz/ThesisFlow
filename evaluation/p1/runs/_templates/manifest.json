@@ -1,0 +1,19 @@
+{
+  "run_id": "",
+  "run_type": "pilot|baseline|candidate|holdout",
+  "started_at": "",
+  "finished_at": "",
+  "git_commit": "",
+  "branch": "",
+  "protocol_commit": "",
+  "database_snapshot_id": "",
+  "model_slots": {
+    "STRONG": "",
+    "LIGHT": "",
+    "EMBED": "",
+    "RERANK": ""
+  },
+  "prompt_registry_version": "1.0.0",
+  "operator": "",
+  "notes": ""
+}

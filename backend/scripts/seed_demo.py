@@ -139,8 +139,12 @@ def main():
         project = Project(
             user_id=user.id,
             name=PROJECT_NAME,
-            description="演讲演示项目：AI 长上下文管理的工程化措施综述",
+            description="参考项目：AI 长上下文管理的工程化措施综述",
             research_question=RESEARCH_QUESTION,
+            screening_criteria=(
+                "优先纳入讨论长上下文管理、上下文压缩、检索增强或推理成本的研究；"
+                "方法与评测信息不完整的文献标记为信息不足。"
+            ),
             stage="literature",
         )
         db.add(project)

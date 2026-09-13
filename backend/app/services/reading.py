@@ -47,12 +47,32 @@ def generate_pre_read(db: Session, doc: Document) -> tuple[str, dict | None]:
         .all()
     )
     abstract = next((c.content for c in chunks if c.typed_label == "abstract"), "")
-    head_text = "\n\n".join(c.content for c in chunks[:3])[:3000]
+    priority_text = "\n\n".join(
+        c.content[:1500]
+        for c in chunks
+        if c.typed_label in ("abstract", "conclusion")
+    )
+    head_text = priority_text + "\n\n" + "\n\n".join(
+        c.content for c in chunks[:6]
+    )[:6000]
     if not head_text and abstract:
         head_text = abstract[:2000]
     prompt = pre_read_prompt(doc.title or "（未知标题）", abstract, head_text)
     raw = chat(
-        "LIGHT", [{"role": "user", "content": prompt}], temperature=0.4, json_mode=True
+        "LIGHT",
+        [{"role": "user", "content": prompt}],
+        temperature=0.4,
+        json_mode=True,
+        trace={
+            "stage": "reading_pre_read",
+            "prompt_template_id": "reading.pre_read",
+            "prompt_template_source": "app.prompts.templates.pre_read_prompt",
+            "context_manifest": {
+                "document_id": doc.id,
+                "chunk_keys": [c.chunk_key for c in chunks[:6]],
+                "head_text_chars": len(head_text),
+            },
+        },
     )
     raw = re.sub(r"(?im)^#\s*一页纸.*$", "", raw).strip()
     m = re.search(r"\{.*\}", raw, re.S)
@@ -61,6 +81,18 @@ def generate_pre_read(db: Session, doc: Document) -> tuple[str, dict | None]:
         try:
             parsed = json.loads(m.group(0))
             if isinstance(parsed, dict) and "core_question" in parsed:
+                focuses = parsed.get("reading_focus")
+                if not isinstance(focuses, list) or not any(str(x).strip() for x in focuses):
+                    candidates = [
+                        *(parsed.get("methods") or [])[:1],
+                        *(parsed.get("conclusions") or [])[:1],
+                        parsed.get("limitations"),
+                    ]
+                    parsed["reading_focus"] = [
+                        f"核对原文中的{str(item).strip()}"
+                        for item in candidates
+                        if str(item or "").strip()
+                    ][:3]
                 structured = parsed
         except json.JSONDecodeError:
             pass
@@ -69,4 +101,15 @@ def generate_pre_read(db: Session, doc: Document) -> tuple[str, dict | None]:
 
 def explain_concept(term: str, context: str | None) -> str:
     prompt = concept_explain_prompt(term, context or "")
-    return chat("LIGHT", [{"role": "user", "content": prompt}], temperature=0.5)
+    return chat(
+        "LIGHT",
+        [{"role": "user", "content": prompt}],
+        temperature=0.5,
+        trace={
+            "stage": "reading_concept_explain",
+            "prompt_template_id": "reading.concept_explain",
+            "prompt_template_source": "app.prompts.templates.concept_explain_prompt",
+            "raw_user_instruction": term,
+            "context_manifest": {"context_chars": len(context or "")},
+        },
+    )

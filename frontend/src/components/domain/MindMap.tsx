@@ -178,7 +178,7 @@ export default function MindMap({
                     fill="#f59e0b"
                   />
                   <text x={p.x + p.w - 52} y={p.y + 4} fontSize={10} fill="white" fontWeight={600}>
-                    研究缺口
+                    候选问题
                   </text>
                 </g>
               )}

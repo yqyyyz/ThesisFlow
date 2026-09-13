@@ -7,7 +7,7 @@ from app.config import settings
 from app.core.llm import chat, embed
 from app.core.vectors import blob_to_vec, cosine_similarity
 from app.models.drafting import Citation
-from app.models.literature import Chunk
+from app.models.literature import Chunk, Document
 
 CITATION_RE = re.compile(r"\[(\d+):(\d+)\]")
 
@@ -44,6 +44,15 @@ def nli_check(sentence: str, evidence: str) -> str:
             temperature=0.0,
             json_mode=True,
             metric_prefix="[NLI_CHECK]",
+            trace={
+                "stage": "citation_nli_verification",
+                "prompt_template_id": "verification.nli",
+                "prompt_template_source": "app.services.verification.nli_check",
+                "context_manifest": {
+                    "claim_chars": len(sentence),
+                    "evidence_chars": min(len(evidence), 900),
+                },
+            },
         )
         m = re.search(r"\{.*\}", raw, re.S)
         if m:
@@ -62,27 +71,53 @@ def verify_citations(
     results = []
     for m in CITATION_RE.finditer(generated_text):
         key = f"{m.group(1)}:{m.group(2)}"
+        cited_doc_id = int(m.group(1))
         start = max(0, m.start() - 150)
         sentence = generated_text[start: m.end()]
         high_risk = bool(HIGH_RISK_RE.search(sentence))
         invalid_th, pass_th = (RISK_INVALID, RISK_PASS) if high_risk else (BASE_INVALID, BASE_PASS)
 
-        if key not in evidence_keys:
+        document_exists = db.get(Document, cited_doc_id) is not None
+        chunk = db.query(Chunk).filter(Chunk.chunk_key == key).first()
+        source_status = "exists" if document_exists else "missing"
+        location_status = (
+            "located"
+            if chunk and chunk.doc_id == cited_doc_id
+            else "mismatch" if chunk else "missing"
+        )
+        in_evidence = key in evidence_keys
+
+        if not document_exists or location_status != "located" or not in_evidence:
+            reason = (
+                "来源不存在"
+                if not document_exists
+                else "引用片段无法定位"
+                if location_status != "located"
+                else "引用未包含在本次证据列表中"
+            )
             row = Citation(
                 draft_id=draft_id,
                 chunk_key=key,
                 sentence_text=sentence,
                 verify_score=0.0,
                 status="invalid",
-                verify_method="vector",
+                verify_method="structural",
             )
             db.add(row)
             results.append(
-                {"chunk_key": key, "status": "invalid", "score": 0.0, "method": "vector"}
+                {
+                    "chunk_key": key,
+                    "status": "invalid",
+                    "score": 0.0,
+                    "method": "structural",
+                    "source_status": source_status,
+                    "location_status": location_status,
+                    "support_status": "not_checked",
+                    "reason": reason,
+                }
             )
             continue
 
-        chunk = db.query(Chunk).filter(Chunk.chunk_key == key).first()
         score = None
         if chunk and chunk.embedding:
             try:
@@ -120,8 +155,28 @@ def verify_citations(
             nli_verdict=verdict,
         )
         db.add(row)
+        support_status = {
+            "normal": "supported",
+            "weak": "uncertain",
+            "invalid": "contradicted" if verdict == "contradict" else "unsupported",
+        }[status]
+        reason = {
+            "supported": "证据支持当前主张",
+            "uncertain": "证据与主张相关，但支持力度不足",
+            "contradicted": "证据与当前主张冲突",
+            "unsupported": "证据不足以支持当前主张",
+        }[support_status]
         results.append(
-            {"chunk_key": key, "status": status, "score": score, "method": method}
+            {
+                "chunk_key": key,
+                "status": status,
+                "score": score,
+                "method": method,
+                "source_status": source_status,
+                "location_status": location_status,
+                "support_status": support_status,
+                "reason": reason,
+            }
         )
     db.commit()
     return results

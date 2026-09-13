@@ -345,6 +345,10 @@ export default function DocumentsPage(props: PageProps<"/projects/[projectId]/do
 
       {view === "matrix" && (
         <div className="mt-4 flex flex-wrap items-center gap-5 rounded-xl border border-neutral-200 bg-white px-5 py-3">
+          <label className="flex items-center gap-2 text-xs text-neutral-600">
+            <input type="checkbox" checked={!showFolded} onChange={(e) => setShowFolded(!e.target.checked)} />
+            自动折叠“暂不优先”且低于阈值的文献
+          </label>
           <span className="text-xs font-medium text-neutral-500">排序权重</span>
           {dimensions.map((d) => (
             <label key={d.key} className="flex items-center gap-2 text-xs text-neutral-600" title={d.desc}>
@@ -375,7 +379,7 @@ export default function DocumentsPage(props: PageProps<"/projects/[projectId]/do
             <thead>
               <tr className="border-b border-neutral-200 text-left text-xs text-neutral-400">
                 <th className="w-[300px] px-4 py-3 font-medium">文献（点击名称精读）</th>
-                <th className="px-3 py-3 font-medium">状态</th>
+                <th className="px-3 py-3 font-medium">状态 / AI 精读建议</th>
                 {dimensions.map((d) => (
                   <th key={d.key} className="px-3 py-3 text-center font-medium" title={d.desc}>
                     {d.name}
@@ -431,6 +435,9 @@ export default function DocumentsPage(props: PageProps<"/projects/[projectId]/do
                     <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_COLORS[doc.status] || "bg-neutral-100 text-neutral-600"}`}>
                       {STATUS_LABELS[doc.status] || doc.status}
                     </span>
+                    <div className={`mt-2 inline-block rounded px-1.5 py-0.5 text-xs font-medium ${doc.reading_recommendation?.status === "推荐精读" ? "bg-blue-100 text-blue-700" : doc.reading_recommendation?.status === "暂不优先" ? "bg-neutral-100 text-neutral-600" : "bg-amber-100 text-amber-700"}`}>{doc.reading_recommendation?.status || "信息不足"}</div>
+                    <p className="mt-1 max-w-52 text-xs text-neutral-500">{doc.reading_recommendation?.reason || "尚未评估，请重新评分"}</p>
+                    {doc.status === "ready" && <button className="mt-1 text-xs text-blue-600" onClick={async () => { try { await api(`/api/documents/${doc.id}:rescore`, { method: "POST" }); await loadDocs(); } catch (e) { setError((e as Error).message); } }}>重新评估</button>}
                   </td>
                   {dimensions.map((d) => {
                     const cell = doc.scores?.[d.key];
@@ -483,7 +490,7 @@ export default function DocumentsPage(props: PageProps<"/projects/[projectId]/do
                         ) : cell ? (
                           <div className="group relative">
                             <div className="font-semibold tabular-nums">
-                              {cell.score}
+                              {cell.score ?? "信息不足"}
                               {cell.user_edited && (
                                 <span
                                   className="ml-1 rounded bg-amber-100 px-1 text-[9px] font-medium text-amber-700"
@@ -610,7 +617,7 @@ export default function DocumentsPage(props: PageProps<"/projects/[projectId]/do
           onClick={() => setShowFolded((v) => !v)}
           className="mt-3 text-xs text-neutral-500 hover:text-blue-600"
         >
-          {showFolded ? "收起低分文献" : `展开 ${foldedCount} 篇低分文献（加权分 < 2.5，已自动折叠）`}
+          {showFolded ? "恢复自动折叠" : `展开 ${foldedCount} 篇暂不优先文献（加权分 < 2.5）`}
         </button>
       )}
 

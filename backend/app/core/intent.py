@@ -80,6 +80,12 @@ def _llm_classify(query: str) -> dict | None:
             temperature=0.0,
             json_mode=True,
             metric_prefix="[INTENT_CLASSIFIER]",
+            trace={
+                "stage": "intent_classification",
+                "prompt_template_id": "intent.classifier",
+                "prompt_template_source": "app.core.intent._llm_classify",
+                "raw_user_instruction": query,
+            },
         )
         m = re.search(r"\{.*\}", raw, re.S)
         if not m:

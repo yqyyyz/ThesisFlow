@@ -29,6 +29,7 @@ interface PreReadStructured {
   conclusions: string[];
   contributions: string;
   limitations: string;
+  reading_focus?: string[];
 }
 
 interface PreRead {
@@ -36,7 +37,7 @@ interface PreRead {
   title: string | null;
   markdown: string;
   structured: PreReadStructured | null;
-  scores: Record<string, { score: number; reason: string }> | null;
+  scores: Record<string, { score: number | null; reason: string }> | null;
 }
 
 interface ChatRef {
@@ -58,6 +59,12 @@ const TAG_COLORS: Record<string, string> = {
   背景知识: "#9333ea",
 };
 const TAG_LABELS = ["重点论据", "借鉴方法", "存疑之处", "背景知识"];
+const TAG_USAGE: Record<string, string> = {
+  重点论据: "候选支持证据，写作时仍需核验",
+  借鉴方法: "方法设计与实施参考",
+  存疑之处: "争议、限制与待核查内容",
+  背景知识: "定义、概念与背景说明",
+};
 
 export default function ReaderOverlay({
   docId,
@@ -433,6 +440,14 @@ export default function ReaderOverlay({
                   </p>
                 </div>
               </div>
+              <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+                <div className="text-[11px] font-bold text-blue-800">阅读重点</div>
+                <ul className="mt-1.5 space-y-1">
+                  {(s.reading_focus || ["此预读卡尚无阅读重点，请结合方法、结果与局限核对原文。"]).map((focus, i) => (
+                    <li key={i} className="text-[11px] leading-relaxed text-neutral-600">• {focus}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
           {preRead && !s && preRead.markdown && (
@@ -456,7 +471,9 @@ export default function ReaderOverlay({
                         }[dim] || dim
                       }
                     </span>
-                    <span className="font-bold text-blue-600">{v.score}</span>
+                    <span className="font-bold text-blue-600">
+                      {v.score ?? "信息不足"}
+                    </span>
                   </div>
                   <div className="mt-0.5 leading-relaxed text-neutral-500">{v.reason}</div>
                 </div>
@@ -485,6 +502,7 @@ export default function ReaderOverlay({
                 <button
                   key={t}
                   onClick={() => handleTag(t)}
+                  title={TAG_USAGE[t]}
                   className="rounded px-2 py-1 text-xs font-medium text-white hover:opacity-80"
                   style={{ background: TAG_COLORS[t] }}
                 >
@@ -544,6 +562,9 @@ export default function ReaderOverlay({
                 批注沉淀（{annotations.length}）
               </h3>
             </div>
+            <p className="shrink-0 px-4 pb-2 text-[10px] leading-relaxed text-neutral-400">
+              论据需核验；方法用于参考；存疑用于争议与限制；背景用于定义说明。
+            </p>
             <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 pb-3 pt-1">
               {annotations.length === 0 && (
                 <div className="text-xs text-neutral-400">

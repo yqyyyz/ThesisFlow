@@ -85,7 +85,7 @@ export default function HomePage() {
   return (
     <div className="mx-auto max-w-5xl px-8 py-10">
       <h1 className="text-2xl font-bold">你好，欢迎回到 ThesisFlow</h1>
-      <p className="mt-1 text-sm text-neutral-500">一站式科研工作台</p>
+      <p className="mt-1 text-sm text-neutral-500">AI 文献与写作工作台 · 筛选、精读与人机协作</p>
 
       <section className="mt-8">
         <div className="flex items-center justify-between">

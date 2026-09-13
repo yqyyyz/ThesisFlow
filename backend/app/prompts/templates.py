@@ -54,7 +54,7 @@ def pre_read_prompt(title: str, abstract: str, full_text_head: str) -> str:
 {full_text_head}
 
 JSON 格式：
-{{"core_question": "核心研究问题，1-2 句", "methods": ["方法与数据要点1", "要点2"], "conclusions": ["主要结论1", "结论2"], "contributions": "贡献，1-2 句", "limitations": "局限，1-2 句"}}
+{{"core_question": "核心研究问题，1-2 句", "methods": ["方法与数据要点1", "要点2"], "conclusions": ["主要结论1", "结论2"], "contributions": "贡献，1-2 句", "limitations": "局限，1-2 句", "reading_focus": ["值得关注的方法、结果或局限，说明阅读时核对什么"]}}
 
 要求：方法/结论各 2-4 条要点，每条不超过 50 字；只基于给定材料。"""
 

@@ -18,6 +18,7 @@ export default function ProjectSettingsModal({
   const [form, setForm] = useState({
     name: "",
     research_question: "",
+    screening_criteria: "",
     description: "",
     stage: "topic",
   });
@@ -32,6 +33,7 @@ export default function ProjectSettingsModal({
         setForm({
           name: p.name,
           research_question: p.research_question || "",
+          screening_criteria: p.screening_criteria || "",
           description: p.description || "",
           stage: p.stage,
         })
@@ -50,6 +52,7 @@ export default function ProjectSettingsModal({
         body: JSON.stringify({
           name: form.name.trim(),
           research_question: form.research_question.trim() || null,
+          screening_criteria: form.screening_criteria.trim() || null,
           description: form.description.trim() || null,
           stage: form.stage,
         }),
@@ -90,6 +93,21 @@ export default function ProjectSettingsModal({
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-neutral-700">
+              文献筛选标准
+              <span className="ml-2 text-xs font-normal text-neutral-400">
+                与研究问题共同用于 AI 精读建议
+              </span>
+            </span>
+            <textarea
+              value={form.screening_criteria}
+              onChange={(e) => setForm({ ...form, screening_criteria: e.target.value })}
+              rows={2}
+              placeholder="说明纳入、排除或优先阅读条件"
               className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             />
           </label>
